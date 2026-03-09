@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+aiosqlite
+pydantic-settings
+python-jose[cryptography]
+passlib
+bcrypt==3.2.2
+python-multipart
+greenlet
+pandas
+openpyxl
+asyncpg
+psycopg2-binary
