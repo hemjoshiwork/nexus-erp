@@ -127,41 +127,29 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 # --- 3. SMART UPLOAD ---
 @router.post("/upload")
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    import uuid
     from sqlalchemy import insert
+    import uuid
     try:
         if file.filename.endswith('.csv'): 
             df = pd.read_csv(file.file)
         else: 
             df = pd.read_excel(file.file)
             
-        # 1. Normalize Header Names
-        df.columns = [c.lower().replace(' ', '_').strip() for c in df.columns]
+        # Clean headers
+        df.columns = [c.lower().replace(' ', '_') for c in df.columns]
         
-        # 2. Convert NaNs to 0
+        # Handle empty cells
         df.fillna(0, inplace=True)
         
-        # 3. Inject Company ID structurally
+        # Backend constraints
         df['company_id'] = current_user.company_id
-        
-        # 4. Enforce SKU constraints natively
         if 'sku' not in df.columns:
             df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
-        else:
-            df['sku'] = df['sku'].apply(lambda x: f'SKU-{str(uuid.uuid4())[:8].upper()}' if not x or x == 0 else str(x))
-            
-        if 'name' not in df.columns:
-            df['name'] = "Unknown Product"
+        
+        # Execute bulk save
+        await db.execute(insert(Product).values(df.to_dict('records')))
+        await db.commit()
 
-        # 5. Restrict to absolute Product SQLAlchemy keys to block exceptions
-        allowed_keys = ['name', 'sku', 'category', 'price', 'quantity', 'description', 'tax_category', 'tax_rate', 'supplier_id', 'company_id']
-        df = df[[c for c in df.columns if c in allowed_keys]]
-
-        records = df.to_dict('records')
-        if records:
-            await db.execute(insert(Product).values(records))
-            await db.commit()
-
-        return {"message": "Success", "added": len(records), "updated": 0}
+        return {"message": "Success", "added": len(df), "updated": 0}
     except Exception as e: 
         raise HTTPException(status_code=400, detail=f"CSV formatting error: {str(e)}")
