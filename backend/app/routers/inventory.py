@@ -129,9 +129,7 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     import re
     import uuid
-    from pydantic import ValidationError
-    from ..schemas import ProductCreate, SupplierCreate
-
+    from sqlalchemy import insert
     try:
         if file.filename.endswith('.csv'): 
             df = pd.read_csv(file.file, dtype=str)
@@ -146,112 +144,45 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
             df['Phone'] = df['Phone'].astype(str).str.replace(r'\.0$', '', regex=True)
             
         df = df.where(pd.notnull(df), None)
+        
+        def get_col(row, *aliases):
+            for alias in aliases:
+                val = row.get(alias)
+                if val is not None and str(val).strip().lower() != 'nan':
+                    return str(val).strip()
+            return None
+
+        products_list = []
+        for _, row in df.iterrows():
+            sku = get_col(row, "SKU", "sku")
+            
+            try: price = float(get_col(row, "Price", "Price (INR)") or 0)
+            except: price = 0.0
+                
+            try: qty = int(float(get_col(row, "Quantity", "Stock", "Qty") or 0))
+            except: qty = 0
+
+            name = get_col(row, "Name", "Product Name")
+            if not name: continue
+                
+            category = get_col(row, "Category")
+            
+            if not sku:
+                sku = f'SKU-{str(uuid.uuid4())[:8].upper()}'
+                
+            products_list.append({
+                "name": name,
+                "sku": sku,
+                "category": category or "General",
+                "price": price,
+                "quantity": qty,
+                "company_id": current_user.company_id
+            })
+
+        if products_list:
+            await db.execute(insert(Product).values(products_list))
+            await db.commit()
+
+        return {"message": "Success", "added": len(products_list), "updated": 0}
     except Exception as e: 
-        raise HTTPException(status_code=400, detail=f"Invalid file: {str(e)}")
-
-    added = 0; updated = 0
-    
-    def get_col(row, *aliases):
-        for alias in aliases:
-            val = row.get(alias)
-            if val is not None and str(val).strip().lower() != 'nan':
-                return str(val).strip()
-        return None
-
-    email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
-
-    for _, row in df.iterrows():
-        # Handle Supplier
-        sup_name = get_col(row, "Supplier", "Supplier Name")
-        sup_id = None
-        
-        if sup_name:
-            stmt = select(Supplier).where(Supplier.name == sup_name, Supplier.company_id == current_user.company_id)
-            res = await db.execute(stmt)
-            supplier_obj = res.scalar_one_or_none()
-            
-            if not supplier_obj:
-                raw_email = get_col(row, "Supplier Email", "Email")
-                valid_email = raw_email if raw_email and re.match(email_pattern, raw_email) else "pending@nexuserp.com"
-                raw_phone = get_col(row, "Supplier Phone", "Phone")
-
-                try:
-                    sup_schema = SupplierCreate(
-                        name=sup_name,
-                        contact_person=get_col(row, "Supplier Contact", "Contact Person"),
-                        email=valid_email,
-                        phone_number=raw_phone if raw_phone and raw_phone.isdigit() and len(raw_phone)==10 else None
-                    )
-                except ValidationError:
-                    sup_schema = SupplierCreate(
-                        name=sup_name,
-                        contact_person=get_col(row, "Supplier Contact", "Contact Person"),
-                        email="pending@nexuserp.com",
-                        phone_number=None
-                    )
-
-                supplier_obj = Supplier(
-                    name=sup_schema.name,
-                    contact_person=sup_schema.contact_person,
-                    email=sup_schema.email,
-                    phone_number=sup_schema.phone_number,
-                    company_id=current_user.company_id
-                )
-                db.add(supplier_obj)
-                await db.flush()
-            sup_id = supplier_obj.id
-
-        # Handle Product
-        sku = get_col(row, "SKU", "sku")
-        
-        try: price = float(get_col(row, "Price", "Price (INR)") or 0)
-        except: price = 0.0
-            
-        try: qty = int(float(get_col(row, "Quantity", "Stock", "Qty") or 0))
-        except: qty = 0
-
-        name = get_col(row, "Name", "Product Name")
-        if not name:
-            continue # Products must have a name
-            
-        category = get_col(row, "Category")
-
-        try:
-            prod_schema = ProductCreate(
-                name=name,
-                sku=sku,
-                category=category or "General",
-                price=price,
-                quantity=qty,
-                supplier_id=sup_id
-            )
-        except ValidationError:
-            continue
-            
-        if not prod_schema.sku:
-            prod_schema.sku = f'SKU-{str(uuid.uuid4())[:8].upper()}'
-            
-        res = await db.execute(select(Product).where(Product.sku == prod_schema.sku, Product.company_id == current_user.company_id))
-        existing = res.scalar_one_or_none()
-        
-        if existing:
-            existing.price = prod_schema.price
-            existing.quantity = prod_schema.quantity
-            existing.name = prod_schema.name
-            existing.category = prod_schema.category
-            if sup_id: existing.supplier_id = prod_schema.supplier_id
-            updated += 1
-        else:
-            db.add(Product(
-                name=prod_schema.name,
-                sku=prod_schema.sku,
-                category=prod_schema.category,
-                price=prod_schema.price,
-                quantity=prod_schema.quantity,
-                supplier_id=prod_schema.supplier_id,
-                company_id=current_user.company_id
-            ))
-            added += 1
-
-    await db.commit()
-    return {"message": "Success", "added": added, "updated": updated}
+        raise HTTPException(status_code=400, detail=f"CSV formatting error: {str(e)}")
