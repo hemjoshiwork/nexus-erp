@@ -20,7 +20,7 @@ async def create_supplier(supplier: SupplierCreate, db: AsyncSession = Depends(g
         name=supplier.name,
         contact_person=supplier.contact_person,
         email=supplier.email,
-        phone=supplier.phone,
+        phone_number=supplier.phone_number,
         company_id=current_user.company_id
     )
     db.add(new_supplier)

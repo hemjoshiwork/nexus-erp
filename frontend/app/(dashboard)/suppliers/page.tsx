@@ -4,7 +4,7 @@ import { Truck, Mail, Phone, Trash2, Plus } from "lucide-react"
 
 export default function SuppliersPage() {
     const [suppliers, setSuppliers] = useState([])
-    const [form, setForm] = useState({ name: "", contact_person: "", email: "", phone: "" })
+    const [form, setForm] = useState({ name: "", contact_person: "", email: "", phone_number: "" })
     const [searchTerm, setSearchTerm] = useState("")
 
     const fetchSuppliers = async () => {
@@ -20,7 +20,7 @@ export default function SuppliersPage() {
     )
 
     const validateForm = () => {
-        if (!form.name || !form.contact_person || !form.email || !form.phone) { alert("All fields mandatory"); return false; }
+        if (!form.name || !form.contact_person || !form.email || !form.phone_number) { alert("All fields mandatory"); return false; }
         return true
     }
 
@@ -33,7 +33,7 @@ export default function SuppliersPage() {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(form),
         })
-        if (res.ok) { setForm({ name: "", contact_person: "", email: "", phone: "" }); fetchSuppliers(); }
+        if (res.ok) { setForm({ name: "", contact_person: "", email: "", phone_number: "" }); fetchSuppliers(); }
         else { alert("Error saving supplier") }
     }
 
@@ -84,11 +84,11 @@ export default function SuppliersPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Email</label>
-                            <input placeholder="contact@acme.com" className={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                            <input type="email" placeholder="contact@acme.com" className={inputStyle} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Phone</label>
-                            <input placeholder="+1 234 567 890" className={inputStyle} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                            <input placeholder="+1 234 567 890" className={inputStyle} value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} />
                         </div>
                         <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg shadow-sm transition-all flex justify-center items-center gap-2">
                             <Truck className="w-4 h-4" />
@@ -119,7 +119,7 @@ export default function SuppliersPage() {
                                             <Mail className="w-3 h-3" /> {s.email}
                                         </td>
                                         <td className="py-4 px-6 text-left text-gray-500 dark:text-slate-500 font-mono text-xs">
-                                            {s.phone}
+                                            {s.phone_number}
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">

@@ -5,7 +5,7 @@ import { Search, ShoppingCart, CreditCard } from "lucide-react"
 export default function BillingPage() {
     const [products, setProducts] = useState([])
     const [cart, setCart] = useState([])
-    const [customer, setCustomer] = useState({ name: "", phone: "", gstin: "" })
+    const [customer, setCustomer] = useState({ name: "", phone_number: "", gstin: "" })
     const [searchTerm, setSearchTerm] = useState("")
 
     useEffect(() => {
@@ -28,18 +28,19 @@ export default function BillingPage() {
         }
     }
 
-    const baseTotal = cart.reduce((acc: any, item: any) => acc + (item.price * item.qty), 0)
-    const totalTax = cart.reduce((acc: any, item: any) => acc + (item.price * item.qty * (item.tax_rate || 18) / 100), 0)
+    const baseTotal = cart.reduce((acc: any, item: any) => acc + ((parseFloat(item.price) || 0) * (parseInt(item.qty) || 0)), 0)
+    const totalTax = cart.reduce((acc: any, item: any) => acc + ((parseFloat(item.price) || 0) * (parseInt(item.qty) || 0) * (parseFloat(item.tax_rate) || 18) / 100), 0)
     const grandTotal = baseTotal + totalTax
 
     const handleCheckout = async () => {
-        if (!customer.name || cart.length === 0) return alert("Add customer name and items")
+        const validItems = cart.map((item: any) => ({ product_id: item.id, quantity: parseInt(item.qty) || 0 })).filter((item: any) => item.quantity > 0)
+        if (!customer.name || validItems.length === 0) return alert("Add customer name and valid items")
         const token = localStorage.getItem("token")
         const payload = {
             customer_name: customer.name,
-            customer_phone: customer.phone,
+            customer_phone_number: customer.phone_number,
             customer_gstin: customer.gstin,
-            items: cart.map((item: any) => ({ product_id: item.id, quantity: item.qty }))
+            items: validItems
         }
         const res = await fetch("http://localhost:8000/sales", {
             method: "POST",
@@ -49,13 +50,17 @@ export default function BillingPage() {
         if (res.ok) {
             alert("Transaction Complete")
             setCart([])
-            setCustomer({ name: "", phone: "", gstin: "" })
+            setCustomer({ name: "", phone_number: "", gstin: "" })
         } else {
             alert("Transaction Failed")
         }
     }
 
     const handleQuantityChange = (id: number, newQty: string) => {
+        if (newQty === "") {
+            setCart(cart.map((item: any) => item.id === id ? { ...item, qty: "" } : item) as any)
+            return
+        }
         const qty = parseInt(newQty)
         if (isNaN(qty) || qty < 1) return // Ignore invalid
 
@@ -112,11 +117,11 @@ export default function BillingPage() {
                     </h2>
                     <div className="space-y-3 mb-6">
                         <input placeholder="Customer Name" className={inputStyle} value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} />
-                        <input placeholder="Phone Number" className={inputStyle} value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
+                        <input placeholder="Phone Number" className={inputStyle} value={customer.phone_number} onChange={e => setCustomer({ ...customer, phone_number: e.target.value })} />
                         <input placeholder="GSTIN (Optional)" className={inputStyle} value={customer.gstin} onChange={e => setCustomer({ ...customer, gstin: e.target.value })} />
                     </div>
 
-                    <div className="flex-1 overflow-auto border-t border-gray-100 dark:border-slate-800 pt-4 mb-4">
+                    <div className="flex-1 max-h-[40vh] overflow-y-auto pr-2 border-t border-gray-100 dark:border-slate-800 pt-4 mb-4">
                         {cart.length === 0 ? (
                             <div className="text-center text-gray-400 dark:text-slate-600 italic py-10">Cart is empty</div>
                         ) : (
@@ -137,7 +142,7 @@ export default function BillingPage() {
                                                 className="w-16 p-1 text-center bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                             />
                                         </div>
-                                        <span className="font-mono text-gray-900 dark:text-white w-20 text-right">₹{(item.price * item.qty).toFixed(2)}</span>
+                                        <span className="font-mono text-gray-900 dark:text-white w-20 text-right">₹{((parseFloat(item.price) || 0) * (parseInt(item.qty) || 0)).toFixed(2)}</span>
                                     </div>
                                 </div>
                             ))

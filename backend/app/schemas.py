@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -8,16 +8,14 @@ class Token(BaseModel):
     token_type: str
 class TokenData(BaseModel):
     email: Optional[str] = None
-class TokenData(BaseModel):
-    email: Optional[str] = None
     company_id: Optional[int] = None
     
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 class UserSignup(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     company_name: str
 
@@ -25,10 +23,18 @@ class UserSignup(BaseModel):
 class SupplierBase(BaseModel):
     name: str
     contact_person: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     gstin: Optional[str] = None
     address: Optional[str] = None
+
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone(cls, v):
+        if v is not None:
+            if not v.isdigit() or len(v) != 10:
+                raise ValueError('Phone number must be exactly 10 digits and numbers only')
+        return v
 
 class SupplierCreate(SupplierBase):
     pass
@@ -40,7 +46,7 @@ class SupplierResponse(SupplierBase):
 # --- PRODUCT ---
 class ProductBase(BaseModel):
     name: str
-    sku: str
+    sku: Optional[str] = None
     category: Optional[str] = "General"
     price: Optional[float] = 0.0
     quantity: Optional[int] = 0
@@ -73,10 +79,26 @@ class SaleItemSchema(BaseModel):
     product_id: int
     quantity: int
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+
 class SaleCreate(BaseModel):
     customer_name: str
-    customer_phone: Optional[str] = None
+    customer_phone_number: Optional[str] = None
     customer_gstin: Optional[str] = None
+    
+    @field_validator('customer_phone_number')
+    @classmethod
+    def validate_phone(cls, v):
+        if v is not None:
+            if not v.isdigit() or len(v) != 10:
+                raise ValueError('Phone number must be exactly 10 digits and numbers only')
+        return v
     payment_mode: Optional[str] = "Cash"
     items: List[SaleItemSchema]
 

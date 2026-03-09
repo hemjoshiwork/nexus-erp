@@ -30,10 +30,16 @@ def get_tax_rate(category: str) -> float:
 # --- 1. PRODUCT CRUD ---
 @router.post("", response_model=ProductResponse)
 async def create_product_root(product: ProductCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    import uuid
+    # Auto-generate SKU if not provided
+    final_sku = product.sku
+    if not final_sku:
+        final_sku = f"SKU-{str(uuid.uuid4())[:8].upper()}"
+
     # 1. Create the product
     new_product = Product(
         name=product.name,
-        sku=product.sku,
+        sku=final_sku,
         category=product.category,
         price=product.price,
         quantity=product.quantity,
@@ -121,24 +127,40 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 # --- 3. SMART UPLOAD ---
 @router.post("/upload")
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    contents = await file.read()
+    import re
+    import uuid
+    from pydantic import ValidationError
+    from ..schemas import ProductCreate, SupplierCreate
+
     try:
-        if file.filename.endswith('.csv'): df = pd.read_csv(BytesIO(contents), dtype=str)
-        else: df = pd.read_excel(BytesIO(contents), dtype=str)
+        if file.filename.endswith('.csv'): 
+            df = pd.read_csv(file.file, dtype=str)
+        else: 
+            df = pd.read_excel(file.file, dtype=str)
+            
         df.columns = [c.strip() for c in df.columns]
-    except Exception as e: raise HTTPException(status_code=400, detail=f"Invalid file: {str(e)}")
+
+        if 'Supplier Phone' in df.columns:
+            df['Supplier Phone'] = df['Supplier Phone'].astype(str).str.replace(r'\.0$', '', regex=True)
+        if 'Phone' in df.columns:
+            df['Phone'] = df['Phone'].astype(str).str.replace(r'\.0$', '', regex=True)
+            
+        df = df.where(pd.notnull(df), None)
+    except Exception as e: 
+        raise HTTPException(status_code=400, detail=f"Invalid file: {str(e)}")
 
     added = 0; updated = 0
     
     def get_col(row, *aliases):
         for alias in aliases:
-            if alias in row: return clean_str(row[alias])
-        return ""
+            val = row.get(alias)
+            if val is not None and str(val).strip().lower() != 'nan':
+                return str(val).strip()
+        return None
+
+    email_pattern = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 
     for _, row in df.iterrows():
-        sku = get_col(row, "SKU", "sku")
-        if not sku: continue 
-
         # Handle Supplier
         sup_name = get_col(row, "Supplier", "Supplier Name")
         sup_id = None
@@ -149,11 +171,30 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
             supplier_obj = res.scalar_one_or_none()
             
             if not supplier_obj:
+                raw_email = get_col(row, "Supplier Email", "Email")
+                valid_email = raw_email if raw_email and re.match(email_pattern, raw_email) else "pending@nexuserp.com"
+                raw_phone = get_col(row, "Supplier Phone", "Phone")
+
+                try:
+                    sup_schema = SupplierCreate(
+                        name=sup_name,
+                        contact_person=get_col(row, "Supplier Contact", "Contact Person"),
+                        email=valid_email,
+                        phone_number=raw_phone if raw_phone and raw_phone.isdigit() and len(raw_phone)==10 else None
+                    )
+                except ValidationError:
+                    sup_schema = SupplierCreate(
+                        name=sup_name,
+                        contact_person=get_col(row, "Supplier Contact", "Contact Person"),
+                        email="pending@nexuserp.com",
+                        phone_number=None
+                    )
+
                 supplier_obj = Supplier(
-                    name=sup_name,
-                    contact_person=get_col(row, "Supplier Contact", "Contact Person"),
-                    email=get_col(row, "Supplier Email", "Email"),
-                    phone=get_col(row, "Supplier Phone", "Phone"),
+                    name=sup_schema.name,
+                    contact_person=sup_schema.contact_person,
+                    email=sup_schema.email,
+                    phone_number=sup_schema.phone_number,
                     company_id=current_user.company_id
                 )
                 db.add(supplier_obj)
@@ -161,32 +202,53 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
             sup_id = supplier_obj.id
 
         # Handle Product
+        sku = get_col(row, "SKU", "sku")
+        
         try: price = float(get_col(row, "Price", "Price (INR)") or 0)
         except: price = 0.0
+            
         try: qty = int(float(get_col(row, "Quantity", "Stock", "Qty") or 0))
         except: qty = 0
 
         name = get_col(row, "Name", "Product Name")
+        if not name:
+            continue # Products must have a name
+            
         category = get_col(row, "Category")
 
-        res = await db.execute(select(Product).where(Product.sku == sku, Product.company_id == current_user.company_id))
-        existing = res.scalar_one_or_none()
-        
-        if existing:
-            existing.price = price
-            existing.quantity = qty
-            if name: existing.name = name
-            if category: existing.category = category
-            if sup_id: existing.supplier_id = sup_id
-            updated += 1
-        else:
-            db.add(Product(
-                name=name or "Unknown",
+        try:
+            prod_schema = ProductCreate(
+                name=name,
                 sku=sku,
                 category=category or "General",
                 price=price,
                 quantity=qty,
-                supplier_id=sup_id,
+                supplier_id=sup_id
+            )
+        except ValidationError:
+            continue
+            
+        if not prod_schema.sku:
+            prod_schema.sku = f'SKU-{str(uuid.uuid4())[:8].upper()}'
+            
+        res = await db.execute(select(Product).where(Product.sku == prod_schema.sku, Product.company_id == current_user.company_id))
+        existing = res.scalar_one_or_none()
+        
+        if existing:
+            existing.price = prod_schema.price
+            existing.quantity = prod_schema.quantity
+            existing.name = prod_schema.name
+            existing.category = prod_schema.category
+            if sup_id: existing.supplier_id = prod_schema.supplier_id
+            updated += 1
+        else:
+            db.add(Product(
+                name=prod_schema.name,
+                sku=prod_schema.sku,
+                category=prod_schema.category,
+                price=prod_schema.price,
+                quantity=prod_schema.quantity,
+                supplier_id=prod_schema.supplier_id,
                 company_id=current_user.company_id
             ))
             added += 1

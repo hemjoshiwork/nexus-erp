@@ -20,7 +20,7 @@ export default function InventoryPage() {
     const [uploadResult, setUploadResult] = useState<any>(null)
 
     const [newProduct, setNewProduct] = useState({ name: "", sku: "", category: "", price: 0, quantity: 0, description: "", supplier_id: "", tax_category: "General" })
-    const [newSupplier, setNewSupplier] = useState({ name: "", contact_person: "", email: "", phone: "" })
+    const [newSupplier, setNewSupplier] = useState({ name: "", contact_person: "", email: "", phone_number: "" })
     const [stockMove, setStockMove] = useState({ product_id: "", movement_type: "in", change_amount: 0, reason: "" })
 
     const fetchData = async () => {
@@ -39,11 +39,11 @@ export default function InventoryPage() {
     )
 
     const validateSupplier = () => {
-        if (!newSupplier.name || !newSupplier.contact_person || !newSupplier.email || !newSupplier.phone) { alert("All fields mandatory"); return false; }
+        if (!newSupplier.name || !newSupplier.contact_person || !newSupplier.email || !newSupplier.phone_number) { alert("All fields mandatory"); return false; }
         return true
     }
     const validateProduct = () => {
-        if (!newProduct.name || !newProduct.sku || !newProduct.category || !newProduct.supplier_id) { alert("All fields mandatory"); return false; }
+        if (!newProduct.name || !newProduct.category || !newProduct.supplier_id) { alert("Name, Category, and Supplier are mandatory"); return false; }
         return true
     }
 
@@ -64,7 +64,7 @@ export default function InventoryPage() {
         if (!validateSupplier()) return
         const token = localStorage.getItem("token")
         const res = await fetch("http://localhost:8000/suppliers", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(newSupplier) })
-        if (res.ok) { const s = await res.json(); setIsSupplierModalOpen(false); setNewSupplier({ name: "", contact_person: "", email: "", phone: "" }); await fetchData(); setNewProduct(prev => ({ ...prev, supplier_id: s.id.toString() })); }
+        if (res.ok) { const s = await res.json(); setIsSupplierModalOpen(false); setNewSupplier({ name: "", contact_person: "", email: "", phone_number: "" }); await fetchData(); setNewProduct(prev => ({ ...prev, supplier_id: s.id.toString() })); }
         else { alert("Failed to create supplier") }
     }
 
@@ -167,11 +167,11 @@ export default function InventoryPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div className="col-span-2"><label className={labelStyle}>Product Name</label><input className={inputStyle} value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} /></div>
-                            <div><label className={labelStyle}>SKU Code</label><input className={inputStyle} value={newProduct.sku} onChange={e => setNewProduct({ ...newProduct, sku: e.target.value })} /></div>
+                            <div><label className={labelStyle}>SKU Code (Auto)</label><input className={inputStyle} value={newProduct.sku} onChange={e => setNewProduct({ ...newProduct, sku: e.target.value })} placeholder="Leave empty for auto-generation" /></div>
                             <div><label className={labelStyle}>Category</label><input className={inputStyle} value={newProduct.category} onChange={e => setNewProduct({ ...newProduct, category: e.target.value })} /></div>
                             <div><label className={labelStyle}>Tax Class</label><select className={inputStyle} value={newProduct.tax_category} onChange={e => setNewProduct({ ...newProduct, tax_category: e.target.value })}><option value="Essential">Essential (0%)</option><option value="Mass Consumption">Mass Consumption (5%)</option><option value="Standard-Low">Standard-Low (12%)</option><option value="General">General (18%)</option><option value="Electronics">Electronics (18%)</option><option value="Luxury">Luxury (28%)</option></select></div>
-                            <div><label className={labelStyle}>Unit Cost (₹)</label><input type="number" className={inputStyle} value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })} /></div>
-                            <div><label className={labelStyle}>Initial Stock</label><input type="number" className={inputStyle} value={newProduct.quantity} onChange={e => setNewProduct({ ...newProduct, quantity: parseInt(e.target.value) })} /></div>
+                            <div><label className={labelStyle}>Unit Cost (₹)</label><input type="number" className={inputStyle} value={isNaN(newProduct.price) ? "" : newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })} /></div>
+                            <div><label className={labelStyle}>Initial Stock</label><input type="number" className={inputStyle} value={isNaN(newProduct.quantity) ? "" : newProduct.quantity} onChange={e => setNewProduct({ ...newProduct, quantity: parseInt(e.target.value) || 0 })} /></div>
                             <div className="col-span-2"><label className={labelStyle}>Supplier</label><div className="flex gap-2"><select className={`flex-1 ${inputStyle}`} value={newProduct.supplier_id} onChange={e => setNewProduct({ ...newProduct, supplier_id: e.target.value })}><option value="">-- Select Supplier --</option>{suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select><button type="button" onClick={() => setIsSupplierModalOpen(true)} className="bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 px-3 py-2 rounded-lg text-gray-600 dark:text-slate-300 border border-gray-300 dark:border-slate-700">+</button></div></div>
                             <div className="col-span-2"><label className={labelStyle}>Description</label><textarea className={`${inputStyle} h-24`} value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} /></div>
                         </div>
@@ -192,7 +192,7 @@ export default function InventoryPage() {
                             <input placeholder="Company Name" className={inputStyle} value={newSupplier.name} onChange={e => setNewSupplier({ ...newSupplier, name: e.target.value })} />
                             <input placeholder="Contact Person" className={inputStyle} value={newSupplier.contact_person} onChange={e => setNewSupplier({ ...newSupplier, contact_person: e.target.value })} />
                             <input placeholder="Email" className={inputStyle} value={newSupplier.email} onChange={e => setNewSupplier({ ...newSupplier, email: e.target.value })} />
-                            <input placeholder="Phone" className={inputStyle} value={newSupplier.phone} onChange={e => setNewSupplier({ ...newSupplier, phone: e.target.value })} />
+                            <input placeholder="Phone" className={inputStyle} value={newSupplier.phone_number} onChange={e => setNewSupplier({ ...newSupplier, phone_number: e.target.value })} />
                         </div>
                         <div className="flex justify-end gap-2 mt-6">
                             <button type="button" onClick={() => setIsSupplierModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
@@ -210,7 +210,7 @@ export default function InventoryPage() {
                         <div className="space-y-4">
                             <div><label className={labelStyle}>Product</label><select className={inputStyle} required onChange={e => setStockMove({ ...stockMove, product_id: e.target.value })}><option value="">Select Product...</option>{products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
                             <div><label className={labelStyle}>Type</label><select className={inputStyle} onChange={e => setStockMove({ ...stockMove, movement_type: e.target.value })}><option value="in">Restock (+)</option><option value="out">Correction (-)</option></select></div>
-                            <div><label className={labelStyle}>Quantity</label><input placeholder="Amount" type="number" className={inputStyle} required onChange={e => setStockMove({ ...stockMove, change_amount: parseInt(e.target.value) })} /></div>
+                            <div><label className={labelStyle}>Quantity</label><input placeholder="Amount" type="number" className={inputStyle} required value={isNaN(stockMove.change_amount) || stockMove.change_amount === 0 ? "" : stockMove.change_amount} onChange={e => setStockMove({ ...stockMove, change_amount: parseInt(e.target.value) || 0 })} /></div>
                         </div>
                         <div className="flex justify-end gap-3 mt-6">
                             <button type="button" onClick={() => setIsStockModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium">Cancel</button>

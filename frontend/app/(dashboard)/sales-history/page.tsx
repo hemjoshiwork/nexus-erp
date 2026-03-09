@@ -53,7 +53,7 @@ export default function SalesHistory() {
                                     </td>
                                     <td className="py-4 px-6 text-left">
                                         <div className="font-medium text-gray-900 dark:text-white">{sale.customer_name}</div>
-                                        <div className="text-xs text-gray-500 dark:text-slate-500">{sale.customer_phone || 'N/A'}</div>
+                                        <div className="text-xs text-gray-500 dark:text-slate-500">{sale.customer_phone_number || 'N/A'}</div>
                                     </td>
                                     <td className="py-4 px-6 text-left">
                                         <span className="bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded text-xs text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700">{sale.items.length} items</span>

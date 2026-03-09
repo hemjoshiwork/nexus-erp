@@ -22,6 +22,9 @@ class User(Base):
     role = Column(String, default="staff")
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     
+    reset_otp = Column(String, nullable=True)
+    otp_expiry = Column(DateTime, nullable=True)
+
     company = relationship("Company", back_populates="users", lazy="noload")
 
 class Supplier(Base):
@@ -30,7 +33,7 @@ class Supplier(Base):
     name = Column(String, index=True, unique=True)
     contact_person = Column(String)
     email = Column(String)
-    phone = Column(String)
+    phone_number = Column(String)
     # NEW: GST Info
     gstin = Column(String, nullable=True)
     address = Column(String, nullable=True)
@@ -80,7 +83,7 @@ class Sale(Base):
     invoice_number = Column(String, unique=True, index=True)
     customer_name = Column(String)
     customer_gstin = Column(String, nullable=True)
-    customer_phone = Column(String, nullable=True)
+    customer_phone_number = Column(String, nullable=True)
     
     total_amount = Column(Float)
     tax_amount = Column(Float)
