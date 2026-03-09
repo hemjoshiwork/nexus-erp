@@ -130,49 +130,69 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
     from sqlalchemy import insert, select
     import uuid
     import pandas as pd
+    import numpy as np
     try:
         df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
         df.columns = [c.strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
         df.rename(columns={'stock_quantity': 'quantity', 'stock': 'quantity'}, inplace=True)
         
-        # --- SMART SUPPLIER LOGIC ---
-        if 'supplier_name' in df.columns and 'supplier_email' in df.columns:
+        # 1. BULLETPROOF DEFAULT SUPPLIER (The Safety Net)
+        stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
+        def_sup = (await db.execute(stmt)).scalar_one_or_none()
+        if not def_sup:
+            def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email="bulk@example.com", phone_number="0000000000", company_id=current_user.company_id)
+            db.add(def_sup)
+            await db.commit()
+            await db.refresh(def_sup)
+            
+        # 2. SMART SUPPLIER LOGIC WITH FALLBACKS
+        if 'supplier_name' in df.columns:
             supplier_map = {}
+            # Force missing names to default to prevent loop crashes
+            df['supplier_name'] = df['supplier_name'].fillna('Default Bulk Supplier')
+            if 'supplier_email' not in df.columns: df['supplier_email'] = 'bulk@example.com'
+            if 'supplier_phone' not in df.columns: df['supplier_phone'] = '0000000000'
+            
+            df['supplier_email'] = df['supplier_email'].fillna('bulk@example.com')
+            
             unique_suppliers = df[['supplier_name', 'supplier_email', 'supplier_phone']].drop_duplicates()
             for _, row in unique_suppliers.iterrows():
-                s_name, s_email = str(row['supplier_name']).strip(), str(row['supplier_email']).strip()
-                s_phone = str(row.get('supplier_phone', '')).strip()
-                if not s_name or s_name == 'nan': continue
+                s_name = str(row['supplier_name']).strip()
+                s_email = str(row['supplier_email']).strip()
+                s_phone = str(row['supplier_phone']).strip()
+                
+                if s_name == 'nan' or not s_name: continue
                 
                 stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
                 sup = (await db.execute(stmt)).scalar_one_or_none()
                 if not sup:
-                    # Maps Supplier Name to both Company Name and Contact Person to satisfy DB
                     sup = Supplier(name=s_name, contact_person=s_name, email=s_email, phone_number=s_phone, company_id=current_user.company_id)
                     db.add(sup)
                     await db.commit()
                     await db.refresh(sup)
                 supplier_map[s_email] = sup.id
-            df['supplier_id'] = df['supplier_email'].apply(lambda x: supplier_map.get(str(x).strip()))
+                
+            # Assign ID, using def_sup.id if lookup fails
+            df['supplier_id'] = df['supplier_email'].apply(lambda x: supplier_map.get(str(x).strip(), def_sup.id))
         else:
-            stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
-            def_sup = (await db.execute(stmt)).scalar_one_or_none()
-            if not def_sup:
-                def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email="bulk@example.com", phone_number="0000000000", company_id=current_user.company_id)
-                db.add(def_sup)
-                await db.commit()
-                await db.refresh(def_sup)
             df['supplier_id'] = def_sup.id
-        # ----------------------------
+            
+        # 3. Clean numeric fields
         for col in ['price', 'quantity']:
             if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # 4. Tax Category Safety
         if 'tax_category' not in df.columns: df['tax_category'] = 'general'
+        df['tax_category'] = df['tax_category'].fillna('general')
         df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)))
         df['company_id'] = current_user.company_id
-        if 'sku' not in df.columns: df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
         
-        df.fillna('', inplace=True)
+        # 5. Fix Empty SKUs
+        if 'sku' not in df.columns: df['sku'] = np.nan
+        df['sku'] = df['sku'].apply(lambda x: f'SKU-{str(uuid.uuid4())[:8].upper()}' if pd.isna(x) or str(x).strip() == '' else str(x))
+        
+        # 6. Final NaN cleanup to prevent Null text constraints
+        df = df.replace({np.nan: ''})
         
         valid_columns = ['name', 'sku', 'category', 'price', 'quantity', 'description', 'tax_category', 'tax_rate', 'supplier_id', 'company_id']
         df_insert = df[[c for c in valid_columns if c in df.columns]]
