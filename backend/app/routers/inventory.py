@@ -140,6 +140,9 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         
         # Handle empty cells
         df.fillna(0, inplace=True)
+        if 'tax_category' not in df.columns:
+            df['tax_category'] = ""
+        df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)) if x else 18.0)
         
         # Backend constraints
         df['company_id'] = current_user.company_id
