@@ -127,62 +127,41 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 # --- 3. SMART UPLOAD ---
 @router.post("/upload")
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    import re
     import uuid
     from sqlalchemy import insert
     try:
         if file.filename.endswith('.csv'): 
-            df = pd.read_csv(file.file, dtype=str)
+            df = pd.read_csv(file.file)
         else: 
-            df = pd.read_excel(file.file, dtype=str)
+            df = pd.read_excel(file.file)
             
-        df.columns = [c.strip() for c in df.columns]
-
-        if 'Supplier Phone' in df.columns:
-            df['Supplier Phone'] = df['Supplier Phone'].astype(str).str.replace(r'\.0$', '', regex=True)
-        if 'Phone' in df.columns:
-            df['Phone'] = df['Phone'].astype(str).str.replace(r'\.0$', '', regex=True)
-            
-        df = df.where(pd.notnull(df), None)
+        # 1. Normalize Header Names
+        df.columns = [c.lower().replace(' ', '_').strip() for c in df.columns]
         
-        def get_col(row, *aliases):
-            for alias in aliases:
-                val = row.get(alias)
-                if val is not None and str(val).strip().lower() != 'nan':
-                    return str(val).strip()
-            return None
-
-        products_list = []
-        for _, row in df.iterrows():
-            sku = get_col(row, "SKU", "sku")
+        # 2. Convert NaNs to 0
+        df.fillna(0, inplace=True)
+        
+        # 3. Inject Company ID structurally
+        df['company_id'] = current_user.company_id
+        
+        # 4. Enforce SKU constraints natively
+        if 'sku' not in df.columns:
+            df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
+        else:
+            df['sku'] = df['sku'].apply(lambda x: f'SKU-{str(uuid.uuid4())[:8].upper()}' if not x or x == 0 else str(x))
             
-            try: price = float(get_col(row, "Price", "Price (INR)") or 0)
-            except: price = 0.0
-                
-            try: qty = int(float(get_col(row, "Quantity", "Stock", "Qty") or 0))
-            except: qty = 0
+        if 'name' not in df.columns:
+            df['name'] = "Unknown Product"
 
-            name = get_col(row, "Name", "Product Name")
-            if not name: continue
-                
-            category = get_col(row, "Category")
-            
-            if not sku:
-                sku = f'SKU-{str(uuid.uuid4())[:8].upper()}'
-                
-            products_list.append({
-                "name": name,
-                "sku": sku,
-                "category": category or "General",
-                "price": price,
-                "quantity": qty,
-                "company_id": current_user.company_id
-            })
+        # 5. Restrict to absolute Product SQLAlchemy keys to block exceptions
+        allowed_keys = ['name', 'sku', 'category', 'price', 'quantity', 'description', 'tax_category', 'tax_rate', 'supplier_id', 'company_id']
+        df = df[[c for c in df.columns if c in allowed_keys]]
 
-        if products_list:
-            await db.execute(insert(Product).values(products_list))
+        records = df.to_dict('records')
+        if records:
+            await db.execute(insert(Product).values(records))
             await db.commit()
 
-        return {"message": "Success", "added": len(products_list), "updated": 0}
+        return {"message": "Success", "added": len(records), "updated": 0}
     except Exception as e: 
         raise HTTPException(status_code=400, detail=f"CSV formatting error: {str(e)}")
