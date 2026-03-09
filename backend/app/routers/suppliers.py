@@ -42,3 +42,25 @@ async def delete_supplier(supplier_id: int, db: AsyncSession = Depends(get_db), 
     await db.delete(supplier)
     await db.commit()
     return {"message": "Supplier deleted successfully"}
+
+from fastapi import Request
+
+@router.put('/{supplier_id}')
+async def update_supplier(supplier_id: int, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from sqlalchemy import select
+    data = await request.json()
+
+    stmt = select(Supplier).where(Supplier.id == supplier_id, Supplier.company_id == current_user.company_id)
+    existing = (await db.execute(stmt)).scalar_one_or_none()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+        
+    # Dynamically update only the fields sent from the frontend
+    if 'name' in data: existing.name = data['name']
+    if 'contact_person' in data: existing.contact_person = data['contact_person']
+    if 'email' in data: existing.email = data['email']
+    if 'phone' in data: existing.phone_number = data['phone'] # Mapped to phone_number to align with model
+    if 'status' in data: existing.status = data['status']
+
+    await db.commit()
+    return {'message': 'Supplier updated successfully'}

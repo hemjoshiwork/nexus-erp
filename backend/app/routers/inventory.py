@@ -127,40 +127,56 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 # --- 3. SMART UPLOAD ---
 @router.post('/upload')
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    from sqlalchemy import insert
+    from sqlalchemy import insert, select
     import uuid
+    import pandas as pd
     try:
-        # Read file (CSV or Excel)
         df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
-        
-        # 1. Standardize Headers (Lowercase, no spaces, no 'product_')
         df.columns = [c.strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
+        df.rename(columns={'stock_quantity': 'quantity', 'stock': 'quantity'}, inplace=True)
         
-        # 2. Map Common Header Mismatches (Fixes 'Stock Quantity' and others)
-        header_map = {'stock_quantity': 'quantity', 'stock': 'quantity', 'item_name': 'name'}
-        df.rename(columns={k: v for k, v in header_map.items() if k in df.columns}, inplace=True)
-        
-        # 3. Clean Numeric Data (Remove $ or commas, fill empty with 0)
-        for col in ['price', 'quantity']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        # --- SMART SUPPLIER LOGIC ---
+        if 'supplier_name' in df.columns and 'supplier_email' in df.columns:
+            supplier_map = {}
+            unique_suppliers = df[['supplier_name', 'supplier_email', 'supplier_phone']].drop_duplicates()
+            for _, row in unique_suppliers.iterrows():
+                s_name, s_email = str(row['supplier_name']).strip(), str(row['supplier_email']).strip()
+                s_phone = str(row.get('supplier_phone', '')).strip()
+                if not s_name or s_name == 'nan': continue
                 
-        # 4. Handle Tax and Metadata
-        if 'tax_category' not in df.columns: 
-            df['tax_category'] = 'general'
+                stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
+                sup = (await db.execute(stmt)).scalar_one_or_none()
+                if not sup:
+                    # Maps Supplier Name to both Company Name and Contact Person to satisfy DB
+                    sup = Supplier(name=s_name, contact_person=s_name, email=s_email, phone_number=s_phone, company_id=current_user.company_id)
+                    db.add(sup)
+                    await db.commit()
+                    await db.refresh(sup)
+                supplier_map[s_email] = sup.id
+            df['supplier_id'] = df['supplier_email'].apply(lambda x: supplier_map.get(str(x).strip()))
+        else:
+            stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
+            def_sup = (await db.execute(stmt)).scalar_one_or_none()
+            if not def_sup:
+                def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email="bulk@example.com", phone_number="0000000000", company_id=current_user.company_id)
+                db.add(def_sup)
+                await db.commit()
+                await db.refresh(def_sup)
+            df['supplier_id'] = def_sup.id
+        # ----------------------------
+        for col in ['price', 'quantity']:
+            if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # Apply the tax calculator function to every row
+        if 'tax_category' not in df.columns: df['tax_category'] = 'general'
         df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)))
         df['company_id'] = current_user.company_id
+        if 'sku' not in df.columns: df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
         
-        if 'sku' not in df.columns:
-            df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
-            
-        # 5. Final NaN cleanup for text fields
         df.fillna('', inplace=True)
         
-        # 6. High-Speed Bulk Insert
-        await db.execute(insert(Product).values(df.to_dict('records')))
+        valid_columns = ['name', 'sku', 'category', 'price', 'quantity', 'description', 'tax_category', 'tax_rate', 'supplier_id', 'company_id']
+        df_insert = df[[c for c in valid_columns if c in df.columns]]
+        await db.execute(insert(Product).values(df_insert.to_dict('records')))
         await db.commit()
         
         return {'message': 'Success', 'added': len(df)}
