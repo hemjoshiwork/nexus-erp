@@ -125,34 +125,44 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
     return {"message": "Stock updated"}
 
 # --- 3. SMART UPLOAD ---
-@router.post("/upload")
+@router.post('/upload')
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from sqlalchemy import insert
     import uuid
     try:
-        if file.filename.endswith('.csv'): 
-            df = pd.read_csv(file.file)
-        else: 
-            df = pd.read_excel(file.file)
-            
-        # Clean headers
-        df.columns = [c.lower().replace(' ', '_') for c in df.columns]
+        # Read file (CSV or Excel)
+        df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
         
-        # Handle empty cells
-        df.fillna(0, inplace=True)
-        if 'tax_category' not in df.columns:
-            df['tax_category'] = ""
-        df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)) if x else 18.0)
+        # 1. Standardize Headers (Lowercase, no spaces, no 'product_')
+        df.columns = [c.strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
         
-        # Backend constraints
+        # 2. Map Common Header Mismatches (Fixes 'Stock Quantity' and others)
+        header_map = {'stock_quantity': 'quantity', 'stock': 'quantity', 'item_name': 'name'}
+        df.rename(columns={k: v for k, v in header_map.items() if k in df.columns}, inplace=True)
+        
+        # 3. Clean Numeric Data (Remove $ or commas, fill empty with 0)
+        for col in ['price', 'quantity']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                
+        # 4. Handle Tax and Metadata
+        if 'tax_category' not in df.columns: 
+            df['tax_category'] = 'general'
+        
+        # Apply the tax calculator function to every row
+        df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)))
         df['company_id'] = current_user.company_id
+        
         if 'sku' not in df.columns:
             df['sku'] = [f'SKU-{str(uuid.uuid4())[:8].upper()}' for _ in range(len(df))]
+            
+        # 5. Final NaN cleanup for text fields
+        df.fillna('', inplace=True)
         
-        # Execute bulk save
+        # 6. High-Speed Bulk Insert
         await db.execute(insert(Product).values(df.to_dict('records')))
         await db.commit()
-
-        return {"message": "Success", "added": len(df), "updated": 0}
-    except Exception as e: 
-        raise HTTPException(status_code=400, detail=f"CSV formatting error: {str(e)}")
+        
+        return {'message': 'Success', 'added': len(df)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f'Upload Error: {str(e)}')
