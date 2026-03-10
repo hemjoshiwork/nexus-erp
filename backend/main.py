@@ -22,7 +22,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://nexus-frontend-f8q9.onrender.com"
+        "https://nexus-erp-1.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
