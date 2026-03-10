@@ -11,7 +11,7 @@ export default function BillingPage() {
     useEffect(() => {
         const fetchData = async () => {
             const token = localStorage.getItem("token")
-            const res = await fetch("http://localhost:8000/inventory/products", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/products", {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (res.ok) setProducts(await res.json())
@@ -42,7 +42,7 @@ export default function BillingPage() {
             customer_gstin: customer.gstin,
             items: validItems
         }
-        const res = await fetch("http://localhost:8000/sales", {
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/sales", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(payload)

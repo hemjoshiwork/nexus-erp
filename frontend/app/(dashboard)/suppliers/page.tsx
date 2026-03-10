@@ -9,7 +9,7 @@ export default function SuppliersPage() {
 
     const fetchSuppliers = async () => {
         const token = localStorage.getItem("token")
-        const res = await fetch("http://localhost:8000/suppliers", { headers: { Authorization: `Bearer ${token}` } })
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", { headers: { Authorization: `Bearer ${token}` } })
         if (res.ok) setSuppliers(await res.json())
     }
     useEffect(() => { fetchSuppliers() }, [])
@@ -28,7 +28,7 @@ export default function SuppliersPage() {
         e.preventDefault()
         if (!validateForm()) return
         const token = localStorage.getItem("token")
-        const res = await fetch("http://localhost:8000/suppliers", {
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify(form),
@@ -40,7 +40,7 @@ export default function SuppliersPage() {
     const handleDelete = async (id: number) => {
         if (!confirm("Are you sure?")) return;
         const token = localStorage.getItem("token")
-        const res = await fetch(`http://localhost:8000/suppliers/${id}`, {
+        const res = await fetch(`https://nexus-erp-f8q9.onrender.com/suppliers/${id}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
         })

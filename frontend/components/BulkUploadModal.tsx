@@ -16,7 +16,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }: any) {
 
         const token = localStorage.getItem("token");
         try {
-            const res = await fetch("http://localhost:8000/inventory/upload", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/upload", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
                 body: formData

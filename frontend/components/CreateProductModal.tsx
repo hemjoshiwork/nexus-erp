@@ -11,7 +11,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: any) 
     const fetchSuppliers = async () => {
         try {
             const token = localStorage.getItem("token");
-            const res = await fetch("http://localhost:8000/suppliers", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -47,7 +47,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: any) 
                 if (!newSupplier.email.endsWith("@gmail.com")) return alert("Email: Must be @gmail.com");
                 if (!/^\d{10}$/.test(newSupplier.phone)) return alert("Phone: Must be 10 digits.");
 
-                const supRes = await fetch("http://localhost:8000/suppliers", {
+                const supRes = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                     body: JSON.stringify(newSupplier),
@@ -66,7 +66,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: any) 
                 supplier_id: finalSupplierId ? parseInt(finalSupplierId) : null
             };
 
-            const prodRes = await fetch("http://localhost:8000/inventory", {
+            const prodRes = await fetch("https://nexus-erp-f8q9.onrender.com/inventory", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify(payload),

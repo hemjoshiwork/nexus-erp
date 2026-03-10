@@ -26,9 +26,9 @@ export default function InventoryPage() {
     const fetchData = async () => {
         const token = localStorage.getItem("token")
         if (!token) return router.push("/login")
-        const resProd = await fetch("http://localhost:8000/inventory/products", { headers: { Authorization: `Bearer ${token}` } })
+        const resProd = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/products", { headers: { Authorization: `Bearer ${token}` } })
         if (resProd.ok) setProducts(await resProd.json())
-        const resSup = await fetch("http://localhost:8000/suppliers", { headers: { Authorization: `Bearer ${token}` } })
+        const resSup = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", { headers: { Authorization: `Bearer ${token}` } })
         if (resSup.ok) setSuppliers(await resSup.json())
     }
     useEffect(() => { fetchData() }, [])
@@ -52,8 +52,8 @@ export default function InventoryPage() {
         if (!validateProduct()) return
         const token = localStorage.getItem("token")
         const payload = { ...newProduct, supplier_id: parseInt(newProduct.supplier_id) }
-        let url = "http://localhost:8000/inventory", method = "POST"
-        if (editingId) { url = `http://localhost:8000/inventory/${editingId}`; method = "PUT"; }
+        let url = "https://nexus-erp-f8q9.onrender.com/inventory", method = "POST"
+        if (editingId) { url = `https://nexus-erp-f8q9.onrender.com/inventory/${editingId}`; method = "PUT"; }
         const res = await fetch(url, { method: method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) })
         if (res.ok) { setIsProductModalOpen(false); setEditingId(null); setNewProduct({ name: "", sku: "", category: "", price: 0, quantity: 0, description: "", supplier_id: "", tax_category: "General" }); fetchData(); }
         else { alert("Failed to save product") }
@@ -63,7 +63,7 @@ export default function InventoryPage() {
         e.preventDefault()
         if (!validateSupplier()) return
         const token = localStorage.getItem("token")
-        const res = await fetch("http://localhost:8000/suppliers", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(newSupplier) })
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(newSupplier) })
         if (res.ok) { const s = await res.json(); setIsSupplierModalOpen(false); setNewSupplier({ name: "", contact_person: "", email: "", phone_number: "" }); await fetchData(); setNewProduct(prev => ({ ...prev, supplier_id: s.id.toString() })); }
         else { alert("Failed to create supplier") }
     }
@@ -71,17 +71,17 @@ export default function InventoryPage() {
     const handleMoveStock = async (e: React.FormEvent) => {
         e.preventDefault()
         const token = localStorage.getItem("token")
-        const res = await fetch("http://localhost:8000/inventory/movements", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(stockMove) })
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/movements", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(stockMove) })
         if (res.ok) { setIsStockModalOpen(false); fetchData(); } else { alert("Failed to move stock") }
     }
 
     const handleUpload = async () => {
         if (!file) return; setLoading(true)
         const token = localStorage.getItem("token"); const formData = new FormData(); formData.append("file", file)
-        try { const res = await fetch("http://localhost:8000/inventory/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }); const data = await res.json(); setUploadResult(data); } catch (e) { alert("Upload Failed") } finally { setLoading(false); fetchData(); }
+        try { const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }); const data = await res.json(); setUploadResult(data); } catch (e) { alert("Upload Failed") } finally { setLoading(false); fetchData(); }
     }
     const closeUpload = () => { setIsUploadModalOpen(false); setUploadResult(null); setFile(null); }
-    const handleClearInventory = async () => { if (!confirm("⚠️ Delete ALL products?")) return; const token = localStorage.getItem("token"); await fetch("http://localhost:8000/inventory/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); fetchData(); }
+    const handleClearInventory = async () => { if (!confirm("⚠️ Delete ALL products?")) return; const token = localStorage.getItem("token"); await fetch("https://nexus-erp-f8q9.onrender.com/inventory/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); fetchData(); }
     const openEditModal = (p: any) => { setNewProduct({ name: p.name, sku: p.sku, category: p.category, price: p.price, quantity: p.quantity, description: p.description || "", supplier_id: p.supplier_id ? p.supplier_id.toString() : "", tax_category: p.tax_category || "General" }); setEditingId(p.id); setIsProductModalOpen(true); }
 
     // Styles

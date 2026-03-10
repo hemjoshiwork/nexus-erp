@@ -8,7 +8,7 @@ export default function SalesHistory() {
 
     const fetchHistory = async () => {
         const token = localStorage.getItem("token")
-        const res = await fetch("http://localhost:8000/sales/history", {
+        const res = await fetch("https://nexus-erp-f8q9.onrender.com/sales/history", {
             headers: { Authorization: `Bearer ${token}` }
         })
         if (res.ok) {

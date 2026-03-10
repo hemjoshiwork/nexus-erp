@@ -19,7 +19,7 @@ export default function LoginPage() {
         formData.append("grant_type", "password")
 
         try {
-            const res = await fetch("http://localhost:8000/token", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/token", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: formData
@@ -40,7 +40,7 @@ export default function LoginPage() {
 
     const handleForgotPassword = async () => {
         try {
-            const res = await fetch("http://localhost:8000/forgot-password", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/forgot-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email })
@@ -58,7 +58,7 @@ export default function LoginPage() {
 
     const handleResetPassword = async () => {
         try {
-            const res = await fetch("http://localhost:8000/reset-password", {
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/reset-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, otp, new_password: newPassword })
