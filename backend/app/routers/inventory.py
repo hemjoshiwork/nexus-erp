@@ -165,7 +165,7 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
                     
                 s_phone = str(row.get('supplier_phone', '0000000000')).strip()
                 
-                cache_key = f"{s_name}_{base_email}"
+                cache_key = f"{s_name}_{s_email}"
                 if cache_key in supplier_map: continue
                 
                 stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
@@ -182,9 +182,8 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         for _, row in df.iterrows():
             # Safe Supplier ID Extraction
             s_name = str(row.get('supplier_name', '')).strip()
-            base_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
-            if base_email.lower() == 'nan': base_email = 'bulk@example.com'
-            cache_key = f"{s_name}_{base_email}"
+            s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+            cache_key = f"{s_name}_{s_email}"
             final_sup_id = supplier_map.get(cache_key, def_sup.id)
             
             # Safe Metadata Extraction
