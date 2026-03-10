@@ -128,6 +128,7 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
 @router.post('/upload')
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from sqlalchemy import insert, select
+    from sqlalchemy.exc import IntegrityError
     import uuid
     import pandas as pd
     try:
@@ -135,17 +136,25 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         df.columns = [str(c).strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
         df.rename(columns={'stock_quantity': 'quantity', 'stock': 'quantity'}, inplace=True)
         
-        # 1. Default Supplier Fallback (Tenant Isolated)
-        stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
+        company_id = current_user.company_id
+        
+        # 1. Bulletproof Default Supplier
+        stmt = select(Supplier).where(Supplier.name == f"Default Bulk {company_id}", Supplier.company_id == company_id)
         def_sup = (await db.execute(stmt)).scalar_one_or_none()
         if not def_sup:
-            tenant_bulk_email = f"bulk+{current_user.company_id}@example.com"
-            def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email=tenant_bulk_email, phone_number="0000000000", company_id=current_user.company_id)
-            db.add(def_sup)
-            await db.commit()
-            await db.refresh(def_sup)
-            
-        # 2. Build Supplier Map (Tenant Isolated)
+            try:
+                def_sup = Supplier(name=f"Default Bulk {company_id}", contact_person="Admin", email=f"bulk_{company_id}@example.com", phone_number="0000000000", company_id=company_id)
+                db.add(def_sup)
+                await db.commit()
+                await db.refresh(def_sup)
+            except IntegrityError:
+                await db.rollback() # CRITICAL: Releases the locked database state
+                def_sup = Supplier(name=f"Default Bulk {company_id}_{uuid.uuid4().hex[:4]}", contact_person="Admin", email=f"bulk_{company_id}_{uuid.uuid4().hex[:4]}@example.com", phone_number="0000000000", company_id=company_id)
+                db.add(def_sup)
+                await db.commit()
+                await db.refresh(def_sup)
+                
+        # 2. Build Supplier Map with Failsafes
         supplier_map = {}
         if 'supplier_name' in df.columns:
             unique_sups = df[['supplier_name', 'supplier_email', 'supplier_phone'] if 'supplier_email' in df.columns else ['supplier_name']].drop_duplicates()
@@ -153,48 +162,51 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
                 s_name = str(row.get('supplier_name', '')).strip()
                 if not s_name or s_name.lower() == 'nan': continue
                 
-                base_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
-                if base_email.lower() == 'nan': base_email = 'bulk@example.com'
-                
-                # ISOLATION: Make email unique to the tenant to bypass global DB constraints
-                if '@' in base_email:
-                    parts = base_email.split('@')
-                    s_email = f"{parts[0]}+{current_user.company_id}@{parts[1]}"
-                else:
-                    s_email = f"{base_email}+{current_user.company_id}@example.com"
-                    
+                raw_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+                if raw_email.lower() == 'nan': raw_email = f"contact_{uuid.uuid4().hex[:6]}@example.com"
                 s_phone = str(row.get('supplier_phone', '0000000000')).strip()
                 
-                cache_key = f"{s_name}_{s_email}"
+                # Bypasses ALL global database unique constraints by injecting the Tenant ID
+                safe_email = f"{company_id}_{raw_email}"
+                safe_name = f"{s_name} (CID:{company_id})" 
+                cache_key = f"{s_name}_{raw_email}" # Cache by ORIGINAL excel values
+                
                 if cache_key in supplier_map: continue
                 
-                stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
+                stmt = select(Supplier).where(Supplier.name == safe_name, Supplier.company_id == company_id)
                 sup = (await db.execute(stmt)).scalar_one_or_none()
+                
                 if not sup:
-                    sup = Supplier(name=s_name, contact_person=s_name, email=s_email, phone_number=s_phone, company_id=current_user.company_id)
-                    db.add(sup)
-                    await db.commit()
-                    await db.refresh(sup)
+                    try:
+                        sup = Supplier(name=safe_name, contact_person=s_name, email=safe_email, phone_number=s_phone, company_id=company_id)
+                        db.add(sup)
+                        await db.commit()
+                        await db.refresh(sup)
+                    except IntegrityError:
+                        await db.rollback() # CRITICAL: Catch collisions
+                        sup = Supplier(name=f"{safe_name} {uuid.uuid4().hex[:4]}", contact_person=s_name, email=f"{uuid.uuid4().hex[:8]}@example.com", phone_number=s_phone, company_id=company_id)
+                        db.add(sup)
+                        await db.commit()
+                        await db.refresh(sup)
+                        
                 supplier_map[cache_key] = sup.id
                 
-        # 3. Build Native Python Records (Bypasses Pandas NULL bugs)
+        # 3. Native Record Processing
         records = []
         for _, row in df.iterrows():
-            # Safe Supplier ID Extraction
             s_name = str(row.get('supplier_name', '')).strip()
-            s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
-            cache_key = f"{s_name}_{s_email}"
+            raw_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+            if raw_email.lower() == 'nan': raw_email = f"contact_{uuid.uuid4().hex[:6]}@example.com"
+            
+            cache_key = f"{s_name}_{raw_email}"
             final_sup_id = supplier_map.get(cache_key, def_sup.id)
             
-            # Safe Metadata Extraction
             sku_val = str(row.get('sku', '')).strip()
-            if not sku_val or sku_val.lower() == 'nan':
-                sku_val = f"SKU-{str(uuid.uuid4())[:8].upper()}"
+            if not sku_val or sku_val.lower() == 'nan': sku_val = f"SKU-{str(uuid.uuid4())[:8].upper()}"
                 
             tax_cat = str(row.get('tax_category', 'general')).strip()
             if not tax_cat or tax_cat.lower() == 'nan': tax_cat = 'general'
             
-            # Safe Numeric Extraction
             try: price_val = float(row.get('price', 0.0))
             except: price_val = 0.0
             if pd.isna(price_val): price_val = 0.0
@@ -203,30 +215,20 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
             except: qty_val = 0
             if pd.isna(qty_val): qty_val = 0
             
-            # Safe String Extraction
-            name_val = str(row.get('name', 'Unnamed Product')).strip()
-            if name_val.lower() == 'nan' or not name_val: name_val = 'Unnamed Product'
-            cat_val = str(row.get('category', 'General')).strip()
-            if cat_val.lower() == 'nan' or not cat_val: cat_val = 'General'
-            
-            desc_val = str(row.get('description', '')).strip()
-            if desc_val.lower() == 'nan': desc_val = ''
-            
-            # Construct pure Python dict
             records.append({
-                'name': name_val,
+                'name': str(row.get('name', 'Unnamed Product')).strip(),
                 'sku': sku_val,
-                'category': cat_val,
+                'category': str(row.get('category', 'General')).strip(),
                 'price': price_val,
                 'quantity': qty_val,
-                'description': desc_val,
+                'description': str(row.get('description', '')).strip(),
                 'tax_category': tax_cat,
                 'tax_rate': get_tax_rate(tax_cat),
                 'supplier_id': int(final_sup_id),
-                'company_id': current_user.company_id
+                'company_id': company_id
             })
         
-        # 4. Chunked Database Insertion (Bypasses 65,535 limit)
+        # 4. Chunked Insertion
         chunk_size = 1000
         for i in range(0, len(records), chunk_size):
             chunk = records[i:i + chunk_size]
@@ -236,6 +238,7 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         return {'message': 'Success', 'added': len(records)}
         
     except Exception as e:
+        await db.rollback() # CRITICAL: Never leave the DB in a locked state
         import traceback
         print("UPLOAD CRASH:", traceback.format_exc())
         raise HTTPException(status_code=400, detail=f'Upload Error: {str(e)}')
