@@ -138,9 +138,11 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 # --- PASSWORD RESET ---
-def send_otp_email(email: str, otp: str):
-    smtp_email = settings.mail_username
-    smtp_password = settings.mail_password_reset
+async def send_otp_email(email: str, otp: str):
+    # Unified to use the exact same credentials as the welcome email
+    smtp_email = getattr(settings, 'smtp_email', None) or getattr(settings, 'mail_username', None)
+    smtp_password = getattr(settings, 'smtp_password', None) or getattr(settings, 'mail_password_reset', None)
+    
     if not smtp_email or not smtp_password:
         print("SMTP credentials not configured. Skipping OTP email.")
         return
@@ -148,18 +150,21 @@ def send_otp_email(email: str, otp: str):
     msg = EmailMessage()
     msg.set_content(f"Your Nexus ERP security code is: {otp}. This expires in 5 minutes.")
     msg['Subject'] = 'Nexus ERP Security Code'
-    msg['From'] = settings.mail_from
+    msg['From'] = getattr(settings, 'mail_from', smtp_email)
     msg['To'] = email
 
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(smtp_email, smtp_password)
-        server.send_message(msg)
-        server.quit()
-        print(f"OTP email sent to {email}")
-    except Exception as e:
-        print(f"Failed to send OTP email: {e}")
+    def _send():
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(smtp_email, smtp_password)
+            server.send_message(msg)
+            server.quit()
+            print(f"OTP email sent to {email}")
+        except Exception as e:
+            print(f"Failed to send OTP email: {e}")
+            
+    await asyncio.to_thread(_send)
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
