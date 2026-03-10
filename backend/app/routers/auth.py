@@ -14,33 +14,35 @@ import random
 router = APIRouter(tags=["auth"])
 
 import os
-import smtplib
-from email.message import EmailMessage
+import requests
 import asyncio
 from fastapi import BackgroundTasks
 from ..config import settings
 
 async def send_welcome_email(email: str, company_name: str):
-    smtp_email = settings.smtp_email
-    smtp_password = settings.smtp_password
-    if not smtp_email or not smtp_password:
-        print("SMTP credentials not configured. Skipping welcome email.")
+    if not settings.brevo_api_key or not settings.mail_from:
+        print("Brevo credentials not configured. Skipping welcome email.")
         return
 
-    msg = EmailMessage()
-    msg.set_content(f"Welcome to Nexus ERP, {company_name}!\n\nWe are excited to have you on board. Start managing your business today.")
-    msg['Subject'] = 'Welcome to Nexus ERP'
-    msg['From'] = smtp_email
-    msg['To'] = email
-
     def _send():
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": settings.brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {"email": settings.mail_from},
+            "to": [{"email": email}],
+            "subject": "Welcome to Nexus ERP",
+            "textContent": f"Welcome to Nexus ERP, {company_name}!\n\nWe are excited to have you on board. Start managing your business today."
+        }
         try:
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(smtp_email, smtp_password)
-            server.send_message(msg)
-            server.quit()
-            print(f"Welcome email sent to {email}")
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code in (200, 201, 202):
+                print(f"Welcome email sent to {email}")
+            else:
+                print(f"Failed to send welcome email: {response.status_code} {response.text}")
         except Exception as e:
             print(f"Failed to send welcome email: {e}")
             
@@ -139,28 +141,29 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 # --- PASSWORD RESET ---
 async def send_otp_email(email: str, otp: str):
-    # Unified to use the exact same credentials as the welcome email
-    smtp_email = getattr(settings, 'smtp_email', None) or getattr(settings, 'mail_username', None)
-    smtp_password = getattr(settings, 'smtp_password', None) or getattr(settings, 'mail_password_reset', None)
-    
-    if not smtp_email or not smtp_password:
-        print("SMTP credentials not configured. Skipping OTP email.")
+    if not settings.brevo_api_key or not settings.mail_from:
+        print("Brevo credentials not configured. Skipping OTP email.")
         return
 
-    msg = EmailMessage()
-    msg.set_content(f"Your Nexus ERP security code is: {otp}. This expires in 5 minutes.")
-    msg['Subject'] = 'Nexus ERP Security Code'
-    msg['From'] = getattr(settings, 'mail_from', smtp_email)
-    msg['To'] = email
-
     def _send():
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": settings.brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {"email": settings.mail_from},
+            "to": [{"email": email}],
+            "subject": "Nexus ERP Security Code",
+            "textContent": f"Your Nexus ERP security code is: {otp}. This expires in 5 minutes."
+        }
         try:
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(smtp_email, smtp_password)
-            server.send_message(msg)
-            server.quit()
-            print(f"OTP email sent to {email}")
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code in (200, 201, 202):
+                print(f"OTP email sent to {email}")
+            else:
+                print(f"Failed to send OTP email: {response.status_code} {response.text}")
         except Exception as e:
             print(f"Failed to send OTP email: {e}")
             

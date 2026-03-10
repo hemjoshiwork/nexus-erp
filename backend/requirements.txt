@@ -13,3 +13,4 @@ openpyxl
 asyncpg
 psycopg2-binary
 email-validator
+requests
