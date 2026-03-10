@@ -22,8 +22,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173", 
         "https://nexus-frontend-f8q9.onrender.com"
     ],
     allow_credentials=True,
