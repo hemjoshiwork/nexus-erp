@@ -135,16 +135,17 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         df.columns = [str(c).strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
         df.rename(columns={'stock_quantity': 'quantity', 'stock': 'quantity'}, inplace=True)
         
-        # 1. Default Supplier Fallback
+        # 1. Default Supplier Fallback (Tenant Isolated)
         stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
         def_sup = (await db.execute(stmt)).scalar_one_or_none()
         if not def_sup:
-            def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email="bulk@example.com", phone_number="0000000000", company_id=current_user.company_id)
+            tenant_bulk_email = f"bulk+{current_user.company_id}@example.com"
+            def_sup = Supplier(name="Default Bulk Supplier", contact_person="Admin", email=tenant_bulk_email, phone_number="0000000000", company_id=current_user.company_id)
             db.add(def_sup)
             await db.commit()
             await db.refresh(def_sup)
             
-        # 2. Build Supplier Map
+        # 2. Build Supplier Map (Tenant Isolated)
         supplier_map = {}
         if 'supplier_name' in df.columns:
             unique_sups = df[['supplier_name', 'supplier_email', 'supplier_phone'] if 'supplier_email' in df.columns else ['supplier_name']].drop_duplicates()
@@ -152,11 +153,19 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
                 s_name = str(row.get('supplier_name', '')).strip()
                 if not s_name or s_name.lower() == 'nan': continue
                 
-                s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
-                s_phone = str(row.get('supplier_phone', '0000000000')).strip()
-                if s_email.lower() == 'nan': s_email = 'bulk@example.com'
+                base_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+                if base_email.lower() == 'nan': base_email = 'bulk@example.com'
                 
-                cache_key = f"{s_name}_{s_email}"
+                # ISOLATION: Make email unique to the tenant to bypass global DB constraints
+                if '@' in base_email:
+                    parts = base_email.split('@')
+                    s_email = f"{parts[0]}+{current_user.company_id}@{parts[1]}"
+                else:
+                    s_email = f"{base_email}+{current_user.company_id}@example.com"
+                    
+                s_phone = str(row.get('supplier_phone', '0000000000')).strip()
+                
+                cache_key = f"{s_name}_{base_email}"
                 if cache_key in supplier_map: continue
                 
                 stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
@@ -173,8 +182,9 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
         for _, row in df.iterrows():
             # Safe Supplier ID Extraction
             s_name = str(row.get('supplier_name', '')).strip()
-            s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
-            cache_key = f"{s_name}_{s_email}"
+            base_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+            if base_email.lower() == 'nan': base_email = 'bulk@example.com'
+            cache_key = f"{s_name}_{base_email}"
             final_sup_id = supplier_map.get(cache_key, def_sup.id)
             
             # Safe Metadata Extraction
