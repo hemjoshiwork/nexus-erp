@@ -130,13 +130,12 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
     from sqlalchemy import insert, select
     import uuid
     import pandas as pd
-    import numpy as np
     try:
         df = pd.read_csv(file.file) if file.filename.endswith('.csv') else pd.read_excel(file.file)
-        df.columns = [c.strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
+        df.columns = [str(c).strip().lower().replace(' ', '_').replace('product_', '') for c in df.columns]
         df.rename(columns={'stock_quantity': 'quantity', 'stock': 'quantity'}, inplace=True)
         
-        # 1. BULLETPROOF DEFAULT SUPPLIER (The Safety Net)
+        # 1. Default Supplier Fallback
         stmt = select(Supplier).where(Supplier.name == "Default Bulk Supplier", Supplier.company_id == current_user.company_id)
         def_sup = (await db.execute(stmt)).scalar_one_or_none()
         if not def_sup:
@@ -145,23 +144,20 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
             await db.commit()
             await db.refresh(def_sup)
             
-        # 2. SMART SUPPLIER LOGIC WITH FALLBACKS
+        # 2. Build Supplier Map
+        supplier_map = {}
         if 'supplier_name' in df.columns:
-            supplier_map = {}
-            # Force missing names to default to prevent loop crashes
-            df['supplier_name'] = df['supplier_name'].fillna('Default Bulk Supplier')
-            if 'supplier_email' not in df.columns: df['supplier_email'] = 'bulk@example.com'
-            if 'supplier_phone' not in df.columns: df['supplier_phone'] = '0000000000'
-            
-            df['supplier_email'] = df['supplier_email'].fillna('bulk@example.com')
-            
-            unique_suppliers = df[['supplier_name', 'supplier_email', 'supplier_phone']].drop_duplicates()
-            for _, row in unique_suppliers.iterrows():
-                s_name = str(row['supplier_name']).strip()
-                s_email = str(row['supplier_email']).strip()
-                s_phone = str(row['supplier_phone']).strip()
+            unique_sups = df[['supplier_name', 'supplier_email', 'supplier_phone'] if 'supplier_email' in df.columns else ['supplier_name']].drop_duplicates()
+            for _, row in unique_sups.iterrows():
+                s_name = str(row.get('supplier_name', '')).strip()
+                if not s_name or s_name.lower() == 'nan': continue
                 
-                if s_name == 'nan' or not s_name: continue
+                s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+                s_phone = str(row.get('supplier_phone', '0000000000')).strip()
+                if s_email.lower() == 'nan': s_email = 'bulk@example.com'
+                
+                cache_key = f"{s_name}_{s_email}"
+                if cache_key in supplier_map: continue
                 
                 stmt = select(Supplier).where(Supplier.email == s_email, Supplier.company_id == current_user.company_id)
                 sup = (await db.execute(stmt)).scalar_one_or_none()
@@ -170,35 +166,67 @@ async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depe
                     db.add(sup)
                     await db.commit()
                     await db.refresh(sup)
-                supplier_map[s_email] = sup.id
+                supplier_map[cache_key] = sup.id
                 
-            # Assign ID, using def_sup.id if lookup fails
-            df['supplier_id'] = df['supplier_email'].apply(lambda x: supplier_map.get(str(x).strip(), def_sup.id))
-        else:
-            df['supplier_id'] = def_sup.id
+        # 3. Build Native Python Records (Bypasses Pandas NULL bugs)
+        records = []
+        for _, row in df.iterrows():
+            # Safe Supplier ID Extraction
+            s_name = str(row.get('supplier_name', '')).strip()
+            s_email = str(row.get('supplier_email', f"contact@{s_name.replace(' ', '').lower()[:10]}.com")).strip()
+            cache_key = f"{s_name}_{s_email}"
+            final_sup_id = supplier_map.get(cache_key, def_sup.id)
             
-        # 3. Clean numeric fields
-        for col in ['price', 'quantity']:
-            if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            # Safe Metadata Extraction
+            sku_val = str(row.get('sku', '')).strip()
+            if not sku_val or sku_val.lower() == 'nan':
+                sku_val = f"SKU-{str(uuid.uuid4())[:8].upper()}"
+                
+            tax_cat = str(row.get('tax_category', 'general')).strip()
+            if not tax_cat or tax_cat.lower() == 'nan': tax_cat = 'general'
+            
+            # Safe Numeric Extraction
+            try: price_val = float(row.get('price', 0.0))
+            except: price_val = 0.0
+            if pd.isna(price_val): price_val = 0.0
+            
+            try: qty_val = int(row.get('quantity', 0))
+            except: qty_val = 0
+            if pd.isna(qty_val): qty_val = 0
+            
+            # Safe String Extraction
+            name_val = str(row.get('name', 'Unnamed Product')).strip()
+            if name_val.lower() == 'nan' or not name_val: name_val = 'Unnamed Product'
+            cat_val = str(row.get('category', 'General')).strip()
+            if cat_val.lower() == 'nan' or not cat_val: cat_val = 'General'
+            
+            desc_val = str(row.get('description', '')).strip()
+            if desc_val.lower() == 'nan': desc_val = ''
+            
+            # Construct pure Python dict
+            records.append({
+                'name': name_val,
+                'sku': sku_val,
+                'category': cat_val,
+                'price': price_val,
+                'quantity': qty_val,
+                'description': desc_val,
+                'tax_category': tax_cat,
+                'tax_rate': get_tax_rate(tax_cat),
+                'supplier_id': int(final_sup_id),
+                'company_id': current_user.company_id
+            })
         
-        # 4. Tax Category Safety
-        if 'tax_category' not in df.columns: df['tax_category'] = 'general'
-        df['tax_category'] = df['tax_category'].fillna('general')
-        df['tax_rate'] = df['tax_category'].apply(lambda x: get_tax_rate(str(x)))
-        df['company_id'] = current_user.company_id
-        
-        # 5. Fix Empty SKUs
-        if 'sku' not in df.columns: df['sku'] = np.nan
-        df['sku'] = df['sku'].apply(lambda x: f'SKU-{str(uuid.uuid4())[:8].upper()}' if pd.isna(x) or str(x).strip() == '' else str(x))
-        
-        # 6. Final NaN cleanup to prevent Null text constraints
-        df = df.replace({np.nan: ''})
-        
-        valid_columns = ['name', 'sku', 'category', 'price', 'quantity', 'description', 'tax_category', 'tax_rate', 'supplier_id', 'company_id']
-        df_insert = df[[c for c in valid_columns if c in df.columns]]
-        await db.execute(insert(Product).values(df_insert.to_dict('records')))
+        # 4. Chunked Database Insertion (Bypasses 65,535 limit)
+        chunk_size = 1000
+        for i in range(0, len(records), chunk_size):
+            chunk = records[i:i + chunk_size]
+            await db.execute(insert(Product).values(chunk))
+            
         await db.commit()
+        return {'message': 'Success', 'added': len(records)}
         
-        return {'message': 'Success', 'added': len(df)}
     except Exception as e:
+        import traceback
+        print("UPLOAD CRASH:", traceback.format_exc())
         raise HTTPException(status_code=400, detail=f'Upload Error: {str(e)}')
