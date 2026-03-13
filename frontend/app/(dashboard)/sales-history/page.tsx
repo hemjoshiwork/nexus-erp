@@ -1,10 +1,13 @@
 "use client"
 import { useState, useEffect } from "react"
 import { History, FileText } from "lucide-react"
+import InvoiceModal from "../../../components/InvoiceModal"
 
 export default function SalesHistory() {
     const [sales, setSales] = useState([])
     const [loading, setLoading] = useState(true)
+    const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null)
+    const [isModalOpen, setIsModalOpen] = useState(false)
 
     const fetchHistory = async () => {
         const token = localStorage.getItem("token")
@@ -18,6 +21,11 @@ export default function SalesHistory() {
     }
 
     useEffect(() => { fetchHistory() }, [])
+
+    const openInvoice = (id: number) => {
+        setSelectedSaleId(id)
+        setIsModalOpen(true)
+    }
 
     return (
         <div className="h-full flex flex-col">
@@ -43,8 +51,11 @@ export default function SalesHistory() {
                             {sales.map((sale: any) => (
                                 <tr key={sale.id} className="odd:bg-white even:bg-gray-50 dark:odd:bg-slate-900 dark:even:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-slate-800 transition-colors">
                                     <td className="py-4 px-6 text-left font-mono text-gray-500 dark:text-slate-400 text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <FileText className="w-4 h-4 text-indigo-500" />
+                                        <div 
+                                            className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors group"
+                                            onClick={() => openInvoice(sale.id)}
+                                        >
+                                            <FileText className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
                                             {sale.invoice_number}
                                         </div>
                                     </td>
@@ -75,6 +86,12 @@ export default function SalesHistory() {
                     </table>
                 </div>
             </div>
+
+            <InvoiceModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                saleId={selectedSaleId} 
+            />
         </div>
     )
 }

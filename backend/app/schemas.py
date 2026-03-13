@@ -114,6 +114,7 @@ class SaleResponse(BaseModel):
     id: int
     invoice_number: str
     customer_name: str
+    customer_gstin: Optional[str] = None
     total_amount: float
     tax_amount: float
     timestamp: datetime

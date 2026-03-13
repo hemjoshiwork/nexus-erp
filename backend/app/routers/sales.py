@@ -72,3 +72,12 @@ async def get_sales_history(db: AsyncSession = Depends(get_db), current_user: Us
     stmt = select(Sale).where(Sale.company_id == current_user.company_id).options(selectinload(Sale.items)).order_by(Sale.timestamp.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
+
+@router.get("/{sale_id}", response_model=SaleResponse)
+async def get_sale(sale_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    stmt = select(Sale).where(Sale.id == sale_id, Sale.company_id == current_user.company_id).options(selectinload(Sale.items))
+    result = await db.execute(stmt)
+    sale = result.scalar_one_or_none()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return sale
