@@ -50,7 +50,7 @@ async def send_welcome_email(email: str, company_name: str):
 # --- SECURITY CONFIG ---
 SECRET_KEY = "mysecretkey" 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 10080
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
