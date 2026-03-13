@@ -69,22 +69,15 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: InvoiceModalPr
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
             </div>
           ) : sale ? (
-            <div className="max-w-3xl mx-auto space-y-8">
+            <div id="printable-area" className="max-w-3xl mx-auto space-y-8">
               {/* Business Header */}
               <div className="flex justify-between items-start border-b-2 border-gray-800 pb-6">
                 <div className="space-y-1">
                   <h1 className="text-3xl font-black tracking-tighter text-indigo-600">NEXUS ERP</h1>
                   <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">Tax Invoice / Bill of Supply</p>
                 </div>
-                <div className="text-right space-y-1 text-sm">
-                  <p className="font-bold text-lg">Nexus ERP Solutions</p>
-                  <p>123 Business Avenue, Tech Park</p>
-                  <p>Bangalore, Karnataka - 560001</p>
-                  <p>Contact: +91 98765 43210</p>
-                  {/* Conditional GSTIN */}
-                  {sale.customer_gstin && (
-                    <p className="font-bold text-indigo-600 mt-2">GSTIN: 29AAAAA0000A1Z5 (Business)</p>
-                  )}
+                <div className="text-right">
+                  <h2 className="text-xl font-bold text-gray-900">Nexus ERP Solutions</h2>
                 </div>
               </div>
 
@@ -171,33 +164,28 @@ export default function InvoiceModal({ isOpen, onClose, saleId }: InvoiceModalPr
 
       <style jsx global>{`
         @media print {
-          .no-print {
-            display: none !important;
+          body * { 
+            visibility: hidden !important; 
           }
-          body {
-            background: white !important;
+          #printable-area, #printable-area * { 
+            visibility: visible !important; 
+          }
+          #printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
           }
-          .printable-area {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            padding: 0 !important;
-            overflow: visible !important;
-            background: white !important;
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .printable-area div {
-              max-width: 100% !important;
-          }
-          .fixed {
-            position: relative !important;
-            background: white !important;
-          }
-          .backdrop-blur-sm {
-              backdrop-filter: none !important;
+          button { 
+            display: none !important; 
           }
         }
       `}</style>
