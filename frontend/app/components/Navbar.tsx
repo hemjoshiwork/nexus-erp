@@ -18,6 +18,7 @@ export default function Navbar() {
         { name: 'Suppliers', path: '/suppliers', icon: Truck },
         { name: 'Billing', path: '/billing', icon: Receipt },
         { name: 'Sales History', path: '/sales-history', icon: History },
+        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     ];
 
     return (
