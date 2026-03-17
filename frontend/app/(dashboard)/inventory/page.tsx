@@ -1,8 +1,8 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 
-export default function InventoryPage() {
+function InventoryContent() {
     const router = useRouter()
     const [products, setProducts] = useState([])
     const [suppliers, setSuppliers] = useState([])
@@ -23,6 +23,9 @@ export default function InventoryPage() {
     const [newSupplier, setNewSupplier] = useState({ name: "", contact_person: "", email: "", phone_number: "" })
     const [stockMove, setStockMove] = useState({ product_id: "", movement_type: "in", change_amount: 0, reason: "" })
 
+    const searchParams = useSearchParams()
+    const filter = searchParams.get("filter")
+
     const fetchData = async () => {
         const token = localStorage.getItem("token")
         if (!token) return router.push("/login")
@@ -33,10 +36,15 @@ export default function InventoryPage() {
     }
     useEffect(() => { fetchData() }, [])
 
-    const filteredProducts = products.filter((p: any) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filteredProducts = products.filter((p: any) => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.sku.toLowerCase().includes(searchTerm.toLowerCase())
+        
+        if (filter === "low_stock") {
+            return matchesSearch && (p.quantity || 0) < 10
+        }
+        return matchesSearch
+    })
 
     const validateSupplier = () => {
         if (!newSupplier.name || !newSupplier.contact_person || !newSupplier.email || !newSupplier.phone_number) { alert("All fields mandatory"); return false; }
@@ -101,6 +109,14 @@ export default function InventoryPage() {
                 </div>
 
                 <div className="flex gap-4 items-center">
+                    {filter === "low_stock" && (
+                        <button 
+                            onClick={() => router.push("/inventory")}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+                        >
+                            Low Stock Filter <span>×</span>
+                        </button>
+                    )}
                     <input
                         type="text"
                         placeholder="Search products..."
@@ -249,5 +265,17 @@ export default function InventoryPage() {
                 </div>
             )}
         </div>
+    )
+}
+
+export default function InventoryPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+        }>
+            <InventoryContent />
+        </Suspense>
     )
 }

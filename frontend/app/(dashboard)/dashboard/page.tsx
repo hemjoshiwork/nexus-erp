@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { LayoutDashboard, IndianRupee, TrendingUp, Package } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -96,8 +97,11 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 
-                {/* Low Stock Alerts (Placeholder logic) */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 hover:shadow-md transition-shadow group">
+                {/* Low Stock Alerts */}
+                <Link 
+                    href="/inventory?filter=low_stock"
+                    className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 hover:shadow-md hover:scale-[1.02] transition-all group cursor-pointer"
+                >
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-600 dark:text-red-400 group-hover:scale-110 transition-transform">
                             <LayoutDashboard size={24} />
@@ -114,7 +118,7 @@ export default function DashboardPage() {
                             Items requiring immediate restock
                         </p>
                     </div>
-                </div>
+                </Link>
             </div>
 
             {/* Quick Actions or some other chart can go here in future */}
