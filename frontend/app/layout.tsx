@@ -17,18 +17,31 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.className} antialiased`} style={{ position: 'relative', minHeight: '100vh' }}>
-                <Providers>{children}</Providers>
+        <html lang="en">
+            {/* AGGRESSIVE TEST: RED BACKGROUND */}
+            <body style={{ position: 'relative', minHeight: '100vh', background: 'red', margin: 0 }}>
+                <Providers>
+                    {children}
+                </Providers>
                 
-                {/* FORCE VISIBILITY LAYER - Highest possible z-index */}
-                <div style={{ 
+                {/* TEST BUTTON - SHOULD BE BRIGHT YELLOW */}
+                <button style={{ 
                     position: 'fixed', 
-                    bottom: '30px', 
-                    right: '30px', 
-                    zIndex: 2147483647,
-                    pointerEvents: 'auto' 
+                    bottom: '50px', 
+                    right: '50px', 
+                    padding: '30px', 
+                    background: 'yellow', 
+                    color: 'black', 
+                    fontWeight: 'bold',
+                    fontSize: '20px',
+                    border: '5px solid black',
+                    zIndex: 9999999,
+                    cursor: 'pointer'
                 }}>
+                    DEPLOYMENT TEST: IF YOU SEE THIS, UPDATE WORKED
+                </button>
+
+                <div style={{ position: 'fixed', bottom: '150px', right: '30px', zIndex: 999999 }}>
                    <ChatWidget />
                 </div>
             </body>
