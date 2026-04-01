@@ -14,3 +14,6 @@ asyncpg
 psycopg2-binary
 email-validator
 requests
+langchain==0.1.13
+langchain-community==0.0.29
+langchain-openai==0.1.1

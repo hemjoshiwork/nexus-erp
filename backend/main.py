@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.app.database import engine, Base
-from backend.app.routers import auth, inventory, suppliers, sales
+from backend.app.routers import auth, inventory, suppliers, sales, chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +28,7 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["*"],
+    
     allow_headers=["*"],
 )
 
@@ -46,3 +47,4 @@ app.include_router(auth.router)
 app.include_router(inventory.router)
 app.include_router(sales.router)
 app.include_router(suppliers.router)
+app.include_router(chat.router)
