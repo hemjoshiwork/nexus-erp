@@ -98,12 +98,20 @@ async def read_products(db: AsyncSession = Depends(get_db), current_user: User =
     result = await db.execute(stmt)
     return result.scalars().all()
 
+@router.options("/clear")
+async def preflight_clear(request: Request):
+    return Response(status_code=200)
+
 @router.delete("/clear")
 async def clear_inventory(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    await db.execute(delete(StockMovement).where(StockMovement.company_id == current_user.company_id))
-    await db.execute(delete(Product).where(Product.company_id == current_user.company_id))
-    await db.commit()
-    return {"message": "Inventory cleared"}
+    try:
+        await db.execute(delete(StockMovement).where(StockMovement.company_id == current_user.company_id))
+        await db.execute(delete(Product).where(Product.company_id == current_user.company_id))
+        await db.commit()
+        return {"message": "Inventory cleared successfully"}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- 2. STOCK MOVEMENTS ---
 @router.post("/movements")
