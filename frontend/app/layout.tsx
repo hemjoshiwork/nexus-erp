@@ -18,28 +18,15 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
-            {/* AGGRESSIVE TEST: RED BACKGROUND */}
-            <body style={{ position: 'relative', minHeight: '100vh', background: 'red', margin: 0 }}>
+        <html lang="en" suppressHydrationWarning>
+            {/* CLEAN PROFESSIONAL BODY */}
+            <body className={`${inter.className} antialiased bg-gray-50 dark:bg-slate-950 transition-colors duration-300`}>
                 <Providers>
                     {children}
                 </Providers>
                 
-                {/* DIAGNOSTIC LAYER: YELLOW BUTTON */}
-                <button style={{ 
-                    position: 'fixed', 
-                    bottom: '50px', 
-                    right: '50px', 
-                    padding: '30px', 
-                    background: 'yellow', 
-                    color: 'black', 
-                    fontWeight: 'bold',
-                    zIndex: 9999999,
-                }}>
-                    BUILD SUCCESSFUL: UPDATE IS LIVE
-                </button>
-
-                <div style={{ position: 'fixed', bottom: '150px', right: '30px', zIndex: 999999 }}>
+                {/* Sleek Chatbot Layer */}
+                <div className="fixed bottom-6 right-6 z-[9999]">
                    <ChatWidget />
                 </div>
             </body>
