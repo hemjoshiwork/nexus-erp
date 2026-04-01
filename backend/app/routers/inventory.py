@@ -93,13 +93,14 @@ async def update_product(product_id: int, product: ProductCreate, db: AsyncSessi
     return final_product
 
 @router.get("/products", response_model=List[ProductResponse])
-async def get_products(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user), limit: int = 100):
+async def get_products(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 100):
     try:
         # Use joinedload to fetch the related supplier in a single 'JOIN' query
         stmt = (
             select(Product)
             .where(Product.company_id == current_user.company_id)
             .options(joinedload(Product.supplier))
+            .offset(skip)
             .limit(limit)
         )
         result = await db.execute(stmt)
