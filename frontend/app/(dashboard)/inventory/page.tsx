@@ -43,12 +43,17 @@ function InventoryContent() {
     const loadMore = async () => {
         const token = localStorage.getItem("token")
         if (!token) return
-        const nextSkip = skip + 100
-        const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
-        if (resProd.ok) {
-            const newProducts = await resProd.json()
-            setProducts(prev => [...prev, ...newProducts])
-            setSkip(nextSkip)
+        setLoading(true)
+        try {
+            const nextSkip = skip + 100
+            const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+            if (resProd.ok) {
+                const newProducts = await resProd.json()
+                setProducts(prev => [...prev, ...newProducts])
+                setSkip(nextSkip)
+            }
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -189,9 +194,10 @@ function InventoryContent() {
                 </div>
                 <button
                     onClick={loadMore}
-                    className="w-full py-3 bg-gray-50 dark:bg-slate-800 text-center text-indigo-600 dark:text-indigo-400 font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border-t border-gray-200 dark:border-slate-800 flex items-center justify-center gap-2"
+                    disabled={loading}
+                    className="w-full py-3 bg-gray-50 dark:bg-slate-800 text-center text-indigo-600 dark:text-indigo-400 font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border-t border-gray-200 dark:border-slate-800 flex items-center justify-center gap-2 disabled:bg-gray-400"
                 >
-                    Load More
+                    {loading ? "Loading More..." : "Load More Products"}
                 </button>
             </div>
 
