@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from typing import List
 import pandas as pd
 from io import BytesIO
@@ -93,10 +93,20 @@ async def update_product(product_id: int, product: ProductCreate, db: AsyncSessi
     return final_product
 
 @router.get("/products", response_model=List[ProductResponse])
-async def read_products(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    stmt = select(Product).where(Product.company_id == current_user.company_id).options(selectinload(Product.supplier))
-    result = await db.execute(stmt)
-    return result.scalars().all()
+async def get_products(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user), limit: int = 100):
+    try:
+        # Use joinedload to fetch the related supplier in a single 'JOIN' query
+        stmt = (
+            select(Product)
+            .where(Product.company_id == current_user.company_id)
+            .options(joinedload(Product.supplier))
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return []
 
 @router.options("/clear")
 async def preflight_clear(request: Request):

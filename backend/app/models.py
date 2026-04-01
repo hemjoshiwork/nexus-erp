@@ -46,9 +46,9 @@ class Supplier(Base):
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    sku = Column(String, unique=True, index=True)
-    category = Column(String, index=True)
+    name = Column(String, index=True) # Indexed for performance
+    sku = Column(String, unique=True, index=True) # Indexed for performance
+    category = Column(String, index=True) # Indexed for performance
     price = Column(Float, default=0.0)
     quantity = Column(Integer, default=0)
     description = Column(String, nullable=True)
