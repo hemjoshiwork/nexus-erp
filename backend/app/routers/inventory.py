@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List
 import pandas as pd
@@ -51,7 +52,11 @@ async def create_product_root(product: ProductCreate, db: AsyncSession = Depends
         company_id=current_user.company_id
     )
     db.add(new_product)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Product SKU already exists or database integrity violation")
     await db.refresh(new_product) # Get the ID
     
     # 2. FIX: Explicitly load the Supplier relationship to prevent "MissingGreenlet" error
@@ -125,6 +130,10 @@ async def create_movement(movement: StockMovementCreate, db: AsyncSession = Depe
     return {"message": "Stock updated"}
 
 # --- 3. SMART UPLOAD ---
+@router.options("/upload")
+async def preflight_upload(request: Request):
+    return Response(status_code=200)
+
 @router.post('/upload')
 async def upload_inventory(file: UploadFile = File(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from sqlalchemy import insert, select

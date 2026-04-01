@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List
 from ..database import get_db
@@ -60,7 +61,11 @@ async def create_sale(sale_data: SaleCreate, db: AsyncSession = Depends(get_db),
     )
     
     db.add(new_sale)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Failed to create sale: database integrity error")
     await db.refresh(new_sale)
     
     stmt = select(Sale).options(selectinload(Sale.items)).where(Sale.id == new_sale.id)

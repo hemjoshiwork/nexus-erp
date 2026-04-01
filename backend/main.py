@@ -21,13 +21,13 @@ app = FastAPI(
 # Allow Frontend to talk to Backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://nexus-erp-1.onrender.com"
-    ],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
 
 app.include_router(auth.router)
 app.include_router(inventory.router)

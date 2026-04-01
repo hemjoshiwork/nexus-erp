@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from typing import List
 from ..database import get_db
 from ..models import Supplier, User
@@ -24,7 +25,11 @@ async def create_supplier(supplier: SupplierCreate, db: AsyncSession = Depends(g
         company_id=current_user.company_id
     )
     db.add(new_supplier)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Supplier name or email already exists")
     await db.refresh(new_supplier)
     return new_supplier
 
@@ -62,5 +67,10 @@ async def update_supplier(supplier_id: int, request: Request, db: AsyncSession =
     if 'phone' in data: existing.phone_number = data['phone'] # Mapped to phone_number to align with model
     if 'status' in data: existing.status = data['status']
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Update failed: supplier name or email collision")
+
     return {'message': 'Supplier updated successfully'}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -98,7 +99,11 @@ async def signup(user_data: UserSignup, background_tasks: BackgroundTasks, db: A
     # 2. Create Company
     new_company = Company(name=user_data.company_name)
     db.add(new_company)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Company name already exists")
     await db.refresh(new_company)
     
     # 3. Create User
@@ -110,7 +115,11 @@ async def signup(user_data: UserSignup, background_tasks: BackgroundTasks, db: A
         role="admin"  # First user gets admin
     )
     db.add(new_user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Email already registered or database error")
     await db.refresh(new_user)
     
     # Trigger Welcome Email
@@ -181,7 +190,11 @@ async def forgot_password(req: ForgotPasswordRequest, background_tasks: Backgrou
     user.reset_otp = otp
     user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
     
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save OTP")
     
     background_tasks.add_task(send_otp_email, user.email, otp)
     return {"message": "OTP sent to your email address"}
@@ -205,5 +218,10 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
     user.reset_otp = None
     user.otp_expiry = None
     
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to reset password")
+
     return {"message": "Password updated successfully"}
