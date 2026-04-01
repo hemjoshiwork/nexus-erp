@@ -1,5 +1,6 @@
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from backend.app.database import engine, Base
@@ -18,19 +19,26 @@ app = FastAPI(
     redirect_slashes=False # Prevents 307 Redirect errors
 )
 
-# Allow Frontend to talk to Backend
+# The Ultimate Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://nexus-erp-1.onrender.com",
-        
-    ],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
-
+# Global Exception Handler (The CORS Safety Net)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log the real error to the terminal
+    print(f"CRITICAL SERVER ERROR: {exc}") 
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error_message": str(exc)},
+        headers={"Access-Control-Allow-Origin": "*"} # Prevents Fake CORS errors
+    )
 
 app.include_router(auth.router)
 app.include_router(inventory.router)
