@@ -22,11 +22,13 @@ app = FastAPI(
 # The Ultimate Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=[
+        "https://nexus-erp-1.onrender.com", 
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
 # Global Exception Handler (The CORS Safety Net)
