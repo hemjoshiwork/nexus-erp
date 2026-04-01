@@ -18,14 +18,18 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.className} antialiased relative`}>
+            <body className={`${inter.className} antialiased`} style={{ position: 'relative', minHeight: '100vh' }}>
                 <Providers>{children}</Providers>
                 
-                {/* Fixed container with highest Z-index to force visibility */}
-                <div className="fixed bottom-0 right-0 z-[9999] pointer-events-none p-6">
-                   <div className="pointer-events-auto">
-                      <ChatWidget />
-                   </div>
+                {/* FORCE VISIBILITY LAYER - Highest possible z-index */}
+                <div style={{ 
+                    position: 'fixed', 
+                    bottom: '30px', 
+                    right: '30px', 
+                    zIndex: 2147483647,
+                    pointerEvents: 'auto' 
+                }}>
+                   <ChatWidget />
                 </div>
             </body>
         </html>

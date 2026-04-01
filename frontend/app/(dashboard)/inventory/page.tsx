@@ -192,13 +192,17 @@ function InventoryContent() {
                         </tbody>
                     </table>
                 </div>
-                <button
+            {/* BRIGHT ORANGE LOAD MORE BUTTON */}
+            <div className="flex justify-center p-10 border-t border-gray-200 dark:border-slate-800">
+                <button 
                     onClick={loadMore}
                     disabled={loading}
-                    className="w-full py-3 bg-gray-50 dark:bg-slate-800 text-center text-indigo-600 dark:text-indigo-400 font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border-t border-gray-200 dark:border-slate-800 flex items-center justify-center gap-2 disabled:bg-gray-400"
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-black px-12 py-5 rounded-full shadow-2xl transition-all transform hover:scale-110 active:scale-95 disabled:bg-gray-400"
+                    style={{ cursor: 'pointer', zIndex: 100 }}
                 >
-                    {loading ? "Loading More..." : "Load More Products"}
+                    {loading ? "SEARCHING DATABASE..." : "LOAD NEXT 100 PRODUCTS"}
                 </button>
+            </div>
             </div>
 
             {/* Product Modal */}
