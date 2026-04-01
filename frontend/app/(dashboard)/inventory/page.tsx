@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 function InventoryContent() {
     const router = useRouter()
-    const [products, setProducts] = useState([])
+    const [products, setProducts] = useState<any[]>([])
+    const [skip, setSkip] = useState(0)
     const [suppliers, setSuppliers] = useState([])
     const [loading, setLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
@@ -29,12 +30,27 @@ function InventoryContent() {
     const fetchData = async () => {
         const token = localStorage.getItem("token")
         if (!token) return router.push("/login")
-        const resProd = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/products", { headers: { Authorization: `Bearer ${token}` } })
-        if (resProd.ok) setProducts(await resProd.json())
+        const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=0&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+        if (resProd.ok) {
+            setProducts(await resProd.json())
+            setSkip(0)
+        }
         const resSup = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", { headers: { Authorization: `Bearer ${token}` } })
         if (resSup.ok) setSuppliers(await resSup.json())
     }
     useEffect(() => { fetchData() }, [])
+
+    const loadMore = async () => {
+        const token = localStorage.getItem("token")
+        if (!token) return
+        const nextSkip = skip + 100
+        const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+        if (resProd.ok) {
+            const newProducts = await resProd.json()
+            setProducts(prev => [...prev, ...newProducts])
+            setSkip(nextSkip)
+        }
+    }
 
     const filteredProducts = products.filter((p: any) => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -171,6 +187,12 @@ function InventoryContent() {
                         </tbody>
                     </table>
                 </div>
+                <button
+                    onClick={loadMore}
+                    className="w-full py-3 bg-gray-50 dark:bg-slate-800 text-center text-indigo-600 dark:text-indigo-400 font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border-t border-gray-200 dark:border-slate-800 flex items-center justify-center gap-2"
+                >
+                    Load More
+                </button>
             </div>
 
             {/* Product Modal */}
