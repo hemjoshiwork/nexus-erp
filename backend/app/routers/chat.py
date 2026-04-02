@@ -22,7 +22,10 @@ async def chat_with_erp(request: ChatRequest):
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
             
-        db = SQLDatabase.from_uri(db_url)
+        # 2. THE FIX: Strip out the async drivers for LangChain
+        sync_db_url = db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+            
+        db = SQLDatabase.from_uri(sync_db_url)
 
         # 2. Initialize GPT-4o
         llm = ChatOpenAI(model="gpt-4o", temperature=0)
