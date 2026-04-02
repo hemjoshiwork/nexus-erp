@@ -26,10 +26,10 @@ async def chat_with_erp(request: ChatRequest):
         # 3. Connect LangChain using the cleaned, synchronous URL
         db = SQLDatabase.from_uri(sync_db_url)
 
-        # 2. NEW BRAIN: Initialize Groq with Llama 3
+        # 2. NEW BRAIN: Initialize Groq with the current Llama 3.3 model
         llm = ChatGroq(
             temperature=0,
-            model_name="llama3-70b-8192" # Free, blazing fast open-source model
+            model_name="llama-3.3-70b-versatile" # FIXED: Updated to supported model
         )
 
         # 3. Security & Style Guardrails
