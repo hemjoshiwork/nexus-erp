@@ -6,6 +6,7 @@ function InventoryContent() {
     const router = useRouter()
     const [products, setProducts] = useState<any[]>([])
     const [skip, setSkip] = useState(0)
+    const [hasMore, setHasMore] = useState(true)
     const [suppliers, setSuppliers] = useState([])
     const [loading, setLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState("")
@@ -32,8 +33,10 @@ function InventoryContent() {
         if (!token) return router.push("/login")
         const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=0&limit=500`, { headers: { Authorization: `Bearer ${token}` } })
         if (resProd.ok) {
-            setProducts(await resProd.json())
+            const initialData = await resProd.json()
+            setProducts(initialData)
             setSkip(0)
+            setHasMore(initialData.length >= 500)
         }
         const resSup = await fetch("https://nexus-erp-f8q9.onrender.com/suppliers", { headers: { Authorization: `Bearer ${token}` } })
         if (resSup.ok) setSuppliers(await resSup.json())
@@ -51,6 +54,7 @@ function InventoryContent() {
                 const newProducts = await resProd.json()
                 setProducts(prev => [...prev, ...newProducts])
                 setSkip(nextSkip)
+                if (newProducts.length < 500) setHasMore(false)
             }
         } finally {
             setLoading(false)
@@ -192,23 +196,24 @@ function InventoryContent() {
                         </tbody>
                     </table>
                 </div>
-            {/* CLEAN PROFESSIONAL LOAD MORE BUTTON */}
-            <div className="flex justify-center py-12 border-t border-gray-200 dark:border-slate-800">
-                <button 
-                    onClick={loadMore}
-                    disabled={loading}
-                    className="bg-indigo-600 text-white font-medium px-8 py-3 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    {loading ? (
-                        <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Loading 500 items...
-                        </>
-                    ) : (
-                        "Load Next 500 Products"
-                    )}
-                </button>
-            </div>
+            {hasMore && (
+                <div className="flex justify-center py-12 border-t border-gray-200 dark:border-slate-800">
+                    <button 
+                        onClick={loadMore}
+                        disabled={loading}
+                        className="bg-indigo-600 text-white font-medium px-8 py-3 rounded-lg shadow-md hover:bg-indigo-700 active:scale-95 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {loading ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Loading 500 items...
+                            </>
+                        ) : (
+                            "Load Next 500 Products"
+                        )}
+                    </button>
+                </div>
+            )}
             </div>
 
             {/* Product Modal */}
