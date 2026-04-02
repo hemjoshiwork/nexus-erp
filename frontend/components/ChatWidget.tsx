@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { MessageCircle, X, Send } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -38,7 +39,24 @@ export default function ChatWidget() {
           <div className="flex-1 p-4 overflow-y-auto space-y-2 text-sm">
             {messages.map((m, i) => (
               <div key={i} className={`${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block p-2 rounded-lg ${m.role === 'user' ? 'bg-indigo-100 text-gray-900 dark:bg-indigo-900 dark:text-white' : 'bg-gray-100 text-gray-900 dark:bg-slate-800 dark:text-gray-100'}`}>{m.text}</span>
+                <div className={`inline-block p-3 rounded-lg ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 dark:text-slate-200'}`}>
+                    {m.role === 'ai' ? (
+                        <div className="text-sm flex flex-col gap-2 text-left">
+                            <ReactMarkdown
+                                components={{
+                                    ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1" {...props} />,
+                                    ol: ({node, ...props}) => <ol className="list-decimal pl-4 space-y-1" {...props} />,
+                                    strong: ({node, ...props}) => <strong className="font-bold text-indigo-400 dark:text-indigo-300" {...props} />,
+                                    p: ({node, ...props}) => <p className="mb-1" {...props} />
+                                }}
+                            >
+                                {m.text}
+                            </ReactMarkdown>
+                        </div>
+                    ) : (
+                        <div className="text-sm">{m.text}</div>
+                    )}
+                </div>
               </div>
             ))}
           </div>
