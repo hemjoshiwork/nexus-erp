@@ -13,18 +13,17 @@ class ChatRequest(BaseModel):
 @router.post("")
 async def chat_with_erp(request: ChatRequest):
     try:
-        # 1. Database Connection String
-        db_url = os.getenv("DATABASE_URL")
-        if not db_url:
-            raise HTTPException(status_code=500, detail="Database URL not found in environment.")
+        # 1. Get your existing Database URL from the environment
+        original_db_url = os.getenv("DATABASE_URL", "sqlite:///./nexus.db")
         
         # Standardize for SQLAlchemy
-        if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        if original_db_url.startswith("postgres://"):
+            original_db_url = original_db_url.replace("postgres://", "postgresql://", 1)
             
-        # 2. THE FIX: Strip out the async drivers for LangChain
-        sync_db_url = db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
-            
+        # 2. THE FIX: Strip out the async drivers (+asyncpg or +aiosqlite)
+        sync_db_url = original_db_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+        
+        # 3. Connect LangChain using the cleaned, synchronous URL
         db = SQLDatabase.from_uri(sync_db_url)
 
         # 2. Initialize GPT-4o
