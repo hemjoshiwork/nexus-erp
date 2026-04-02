@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import os
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 
 router = APIRouter(prefix="/api/chat", tags=["AI Chat"])
 
@@ -26,8 +26,11 @@ async def chat_with_erp(request: ChatRequest):
         # 3. Connect LangChain using the cleaned, synchronous URL
         db = SQLDatabase.from_uri(sync_db_url)
 
-        # 2. Initialize GPT-4o
-        llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        # 2. NEW BRAIN: Initialize Groq with Llama 3
+        llm = ChatGroq(
+            temperature=0,
+            model_name="llama3-70b-8192" # Free, blazing fast open-source model
+        )
 
         # 3. Security & Style Guardrails
         system_prompt = """
@@ -46,6 +49,7 @@ async def chat_with_erp(request: ChatRequest):
         agent = create_sql_agent(
             llm=llm,
             db=db,
+            agent_type="openai-tools",
             verbose=True, 
             prefix=system_prompt
         )
