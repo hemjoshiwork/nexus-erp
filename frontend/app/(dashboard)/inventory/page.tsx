@@ -30,7 +30,7 @@ function InventoryContent() {
     const fetchData = async () => {
         const token = localStorage.getItem("token")
         if (!token) return router.push("/login")
-        const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=0&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+        const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=0&limit=500`, { headers: { Authorization: `Bearer ${token}` } })
         if (resProd.ok) {
             setProducts(await resProd.json())
             setSkip(0)
@@ -45,8 +45,8 @@ function InventoryContent() {
         if (!token) return
         setLoading(true)
         try {
-            const nextSkip = skip + 100
-            const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+            const nextSkip = skip + 500
+            const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=500`, { headers: { Authorization: `Bearer ${token}` } })
             if (resProd.ok) {
                 const newProducts = await resProd.json()
                 setProducts(prev => [...prev, ...newProducts])
@@ -202,10 +202,10 @@ function InventoryContent() {
                     {loading ? (
                         <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Loading...
+                            Loading 500 items...
                         </>
                     ) : (
-                        "Load More Products"
+                        "Load Next 500 Products"
                     )}
                 </button>
             </div>
