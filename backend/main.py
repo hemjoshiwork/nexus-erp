@@ -20,15 +20,16 @@ app = FastAPI(
 )
 
 # The Ultimate Middleware
+origins = [
+    "http://localhost:3000",
+    "https://nexus-erp-1.onrender.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://nexus-erp-1.onrender.com", 
-        "http://localhost:3000"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    
     allow_headers=["*"],
 )
 
