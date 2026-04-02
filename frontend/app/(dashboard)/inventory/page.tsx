@@ -52,9 +52,23 @@ function InventoryContent() {
             const resProd = await fetch(`https://nexus-erp-f8q9.onrender.com/inventory/products?skip=${nextSkip}&limit=500`, { headers: { Authorization: `Bearer ${token}` } })
             if (resProd.ok) {
                 const newProducts = await resProd.json()
-                setProducts(prev => [...prev, ...newProducts])
+                
+                // BUG FIX: If backend returns 0 items, or fewer items than the limit, we reached the end.
+                if (newProducts.length === 0 || newProducts.length < 500) {
+                    setHasMore(false)
+                }
+
+                setProducts(prev => {
+                    // BUG FIX: Prevent the "wrap around" loop by checking if the first new item already exists
+                    const alreadyExists = prev.some((p: any) => p.id === newProducts[0]?.id || p.sku === newProducts[0]?.sku);
+                    if (alreadyExists) {
+                        setHasMore(false); // Kill the button
+                        return prev; // Don't add the duplicates
+                    }
+                    return [...prev, ...newProducts];
+                });
+                
                 setSkip(nextSkip)
-                if (newProducts.length < 500) setHasMore(false)
             }
         } finally {
             setLoading(false)

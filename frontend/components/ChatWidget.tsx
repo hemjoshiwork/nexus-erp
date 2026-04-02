@@ -33,17 +33,17 @@ export default function ChatWidget() {
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-20 right-0 w-80 h-96 bg-white rounded-lg shadow-2xl flex flex-col border border-gray-200">
+        <div className="absolute bottom-20 right-0 w-80 h-96 bg-white dark:bg-slate-900 rounded-lg shadow-2xl flex flex-col border border-gray-200 dark:border-slate-700">
           <div className="p-4 bg-indigo-600 text-white rounded-t-lg font-bold">Nexus AI Assistant</div>
           <div className="flex-1 p-4 overflow-y-auto space-y-2 text-sm">
             {messages.map((m, i) => (
               <div key={i} className={`${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block p-2 rounded-lg ${m.role === 'user' ? 'bg-indigo-100' : 'bg-gray-100'}`}>{m.text}</span>
+                <span className={`inline-block p-2 rounded-lg ${m.role === 'user' ? 'bg-indigo-100 text-gray-900 dark:bg-indigo-900 dark:text-white' : 'bg-gray-100 text-gray-900 dark:bg-slate-800 dark:text-gray-100'}`}>{m.text}</span>
               </div>
             ))}
           </div>
-          <div className="p-2 border-t flex gap-2">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1 border rounded px-2 py-1 outline-none" placeholder="Ask AI..." />
+          <div className="p-2 border-t dark:border-slate-700 flex gap-2">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1 border dark:border-slate-700 rounded px-2 py-1 outline-none dark:bg-slate-800 dark:text-white" placeholder="Ask AI..." />
             <button onClick={handleSend} className="bg-indigo-600 p-2 rounded text-white"><Send size={16} /></button>
           </div>
         </div>
