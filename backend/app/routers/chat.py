@@ -55,7 +55,16 @@ async def chat_with_erp(request: ChatRequest):
         )
         
         # 5. Run the query and return JSON
-        response = agent.invoke({"input": request.query})
+        user_query = request.query
+        formatting_rules = """
+        \n\nCRITICAL SYSTEM INSTRUCTION: 
+        Always format your response beautifully. 
+        1. If listing products, suppliers, or multiple items, ALWAYS use markdown bullet points or numbered lists.
+        2. Put each item on a new line.
+        3. Use bold text for important numbers or names.
+        4. NEVER output a single giant paragraph of comma-separated items.
+        """
+        response = agent.invoke({"input": user_query + formatting_rules})
         return {"answer": response["output"]}
         
     except Exception as e:
