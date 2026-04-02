@@ -56,15 +56,14 @@ async def chat_with_erp(request: ChatRequest):
         
         # 5. Run the query and return JSON
         user_query = request.query
-        formatting_rules = """
-        \n\nCRITICAL SYSTEM INSTRUCTION: 
-        Always format your response beautifully. 
-        1. If listing products, suppliers, or multiple items, ALWAYS use markdown bullet points or numbered lists.
-        2. Put each item on a new line.
-        3. Use bold text for important numbers or names.
-        4. NEVER output a single giant paragraph of comma-separated items.
+        system_instructions = """
+        \n\nCRITICAL SYSTEM INSTRUCTIONS:
+        1. BUSINESS RULE: If the user asks for "low stock", ALWAYS filter for products where the stock/quantity is strictly less than 10 units.
+        2. FORMATTING: Always use Markdown bullet points (*). Put each item on a new line. 
+        3. FORMATTING: Use **bold** text for product names.
+        4. NEVER output a single paragraph of comma-separated items.
         """
-        response = agent.invoke({"input": user_query + formatting_rules})
+        response = agent.invoke({"input": user_query + system_instructions})
         return {"answer": response["output"]}
         
     except Exception as e:
