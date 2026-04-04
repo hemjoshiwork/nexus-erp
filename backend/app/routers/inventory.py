@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
 from typing import List
 import pandas as pd
 from io import BytesIO
 from ..database import get_db
-from ..models import Product, StockMovement, Supplier, User
+from ..models import Product, StockMovement, Supplier, User, SaleItem
 from ..schemas import ProductCreate, ProductResponse, StockMovementCreate
 from ..routers.auth import get_current_user
 
@@ -116,14 +116,25 @@ async def preflight_clear(request: Request):
 @router.delete("/clear")
 async def clear_inventory(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        # 1. Delete dependent child records FIRST (Stock Movements)
+        # 1. Delete dependent Stock Movements (Inventory history is safe to clear)
         await db.execute(delete(StockMovement).where(StockMovement.company_id == current_user.company_id))
         
-        # 2. Now safe to delete the parent records (Products)
+        # 2. PRESERVE SALES: Unlink products from sale items instead of deleting them!
+        # This sets product_id to NULL so the sales receipt is kept perfectly intact.
+        await db.execute(
+            update(SaleItem)
+            .where(SaleItem.company_id == current_user.company_id)
+            .values(product_id=None)
+        )
+        
+        # 3. Now it is safe to delete the Products
         await db.execute(delete(Product).where(Product.company_id == current_user.company_id))
         
+        # 4. Delete the Suppliers as requested
+        await db.execute(delete(Supplier).where(Supplier.company_id == current_user.company_id))
+        
         await db.commit()
-        return {"message": "Inventory cleared successfully"}
+        return {"message": "Inventory and suppliers purged. Sales history safely preserved!"}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
