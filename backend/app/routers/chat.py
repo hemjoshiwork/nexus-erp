@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import os
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_groq import ChatGroq
+from ..routers.auth import get_current_user
+from ..models import User
 
 router = APIRouter(prefix="/api/chat", tags=["AI Chat"])
 
@@ -11,7 +13,7 @@ class ChatRequest(BaseModel):
     query: str
 
 @router.post("")
-async def chat_with_erp(request: ChatRequest):
+async def chat_with_erp(request: ChatRequest, current_user: User = Depends(get_current_user)):
     try:
         # 1. Get your existing Database URL from the environment
         original_db_url = os.getenv("DATABASE_URL", "sqlite:///./nexus.db")
@@ -56,12 +58,13 @@ async def chat_with_erp(request: ChatRequest):
         
         # 5. Run the query and return JSON
         user_query = request.query
-        system_instructions = """
+        system_instructions = f"""
         \n\nCRITICAL SYSTEM INSTRUCTIONS:
-        1. TOKEN LIMIT SAFETY: You MUST append "LIMIT 15" to the end of EVERY single SELECT query you execute. Do not return more than 15 rows under any circumstances.
-        2. AGGREGATION: If the user asks for the highest, lowest, total, or sum, use SQL aggregation (e.g., ORDER BY price DESC LIMIT 1) rather than fetching all rows.
-        3. BUSINESS RULE: "Low stock" means quantity < 10.
-        4. FORMATTING: Always use Markdown bullet points (*). Put each item on a new line. Use **bold** for product names.
+        1. DATA SECURITY: You are answering questions for company_id {current_user.company_id}. You MUST include "WHERE company_id = {current_user.company_id}" in EVERY SINGLE SQL query you write. NEVER query data outside this company.
+        2. INVENTORY VALUE: If the user asks for "total inventory value" or "total value", you MUST calculate it exactly as: SELECT SUM(price * quantity) FROM products WHERE company_id = {current_user.company_id}.
+        3. TOKEN LIMIT SAFETY: Append "LIMIT 15" to the end of every SELECT query unless it is an aggregation (SUM, MAX, MIN).
+        4. BUSINESS RULE: "Low stock" means quantity < 10.
+        5. FORMATTING: Use Markdown bullet points (*). Put each item on a new line. Use **bold** for product names.
         """
         response = agent.invoke({"input": user_query + system_instructions})
         return {"answer": response["output"]}
