@@ -58,10 +58,10 @@ async def chat_with_erp(request: ChatRequest):
         user_query = request.query
         system_instructions = """
         \n\nCRITICAL SYSTEM INSTRUCTIONS:
-        1. BUSINESS RULE: If the user asks for "low stock", ALWAYS filter for products where the stock/quantity is strictly less than 10 units.
-        2. FORMATTING: Always use Markdown bullet points (*). Put each item on a new line. 
-        3. FORMATTING: Use **bold** text for product names.
-        4. NEVER output a single paragraph of comma-separated items.
+        1. TOKEN LIMIT SAFETY: You MUST append "LIMIT 15" to the end of EVERY single SELECT query you execute. Do not return more than 15 rows under any circumstances.
+        2. AGGREGATION: If the user asks for the highest, lowest, total, or sum, use SQL aggregation (e.g., ORDER BY price DESC LIMIT 1) rather than fetching all rows.
+        3. BUSINESS RULE: "Low stock" means quantity < 10.
+        4. FORMATTING: Always use Markdown bullet points (*). Put each item on a new line. Use **bold** for product names.
         """
         response = agent.invoke({"input": user_query + system_instructions})
         return {"answer": response["output"]}
