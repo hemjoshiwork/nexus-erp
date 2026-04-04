@@ -128,7 +128,32 @@ function InventoryContent() {
         try { const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/upload", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData }); const data = await res.json(); setUploadResult(data); } catch (e) { alert("Upload Failed") } finally { setLoading(false); fetchData(); }
     }
     const closeUpload = () => { setIsUploadModalOpen(false); setUploadResult(null); setFile(null); }
-    const handleClearInventory = async () => { if (!confirm("⚠️ Delete ALL products?")) return; const token = localStorage.getItem("token"); await fetch("https://nexus-erp-f8q9.onrender.com/inventory/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); fetchData(); }
+    const handleClearInventory = async () => {
+        if (!confirm("Are you sure you want to nuke all products? This cannot be undone.")) return;
+        
+        try {
+            const token = localStorage.getItem("token"); // Get auth token
+            
+            const res = await fetch("https://nexus-erp-f8q9.onrender.com/inventory/clear", {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${token}` // THE FIX: Send token
+                }
+            });
+            
+            if (res.ok) {
+                setProducts([]); // Clear UI
+                setHasMore(false);
+                alert("Inventory cleared successfully!");
+                fetchData();
+            } else {
+                const err = await res.json();
+                alert(`Clear failed: ${err.detail || err.message}`);
+            }
+        } catch (error) {
+            console.error("Clear error:", error);
+        }
+    };
     const openEditModal = (p: any) => { setNewProduct({ name: p.name, sku: p.sku, category: p.category, price: p.price, quantity: p.quantity, description: p.description || "", supplier_id: p.supplier_id ? p.supplier_id.toString() : "", tax_category: p.tax_category || "General" }); setEditingId(p.id); setIsProductModalOpen(true); }
 
     // Styles

@@ -116,8 +116,12 @@ async def preflight_clear(request: Request):
 @router.delete("/clear")
 async def clear_inventory(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
+        # 1. Delete dependent child records FIRST (Stock Movements)
         await db.execute(delete(StockMovement).where(StockMovement.company_id == current_user.company_id))
+        
+        # 2. Now safe to delete the parent records (Products)
         await db.execute(delete(Product).where(Product.company_id == current_user.company_id))
+        
         await db.commit()
         return {"message": "Inventory cleared successfully"}
     except Exception as e:
