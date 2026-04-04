@@ -15,9 +15,13 @@ export default function ChatWidget() {
     setQuery("");
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch("https://nexus-erp-f8q9.onrender.com/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ query }),
       });
       const data = await res.json();
