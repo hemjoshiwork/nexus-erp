@@ -119,11 +119,14 @@ async def clear_inventory(db: AsyncSession = Depends(get_db), current_user: User
         # 1. Delete dependent Stock Movements (Inventory history is safe to clear)
         await db.execute(delete(StockMovement).where(StockMovement.company_id == current_user.company_id))
         
-        # 2. PRESERVE SALES: Unlink products from sale items instead of deleting them!
-        # This sets product_id to NULL so the sales receipt is kept perfectly intact.
+        # 2. PRESERVE SALES: Unlink products from sale items via subquery
+        # Get all product IDs for this company
+        company_product_ids_query = select(Product.id).where(Product.company_id == current_user.company_id)
+        
+        # Update only SaleItems attached to those specific products
         await db.execute(
             update(SaleItem)
-            .where(SaleItem.company_id == current_user.company_id)
+            .where(SaleItem.product_id.in_(company_product_ids_query))
             .values(product_id=None)
         )
         
