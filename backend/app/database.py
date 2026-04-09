@@ -8,6 +8,9 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./inven
 connect_args = {}
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
+elif SQLALCHEMY_DATABASE_URL.startswith("postgresql"):
+    # THE RENDER FIX: Force SSL for external PostgreSQL connections
+    connect_args["ssl"] = "require" 
 
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL, 
